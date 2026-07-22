@@ -1,0 +1,15 @@
+D:\Melior\EmployeeManagement.Application\bin\Debug\net8.0\EmployeeManagement.Application.deps.json
+D:\Melior\EmployeeManagement.Application\bin\Debug\net8.0\EmployeeManagement.Application.dll
+D:\Melior\EmployeeManagement.Application\bin\Debug\net8.0\EmployeeManagement.Application.pdb
+D:\Melior\EmployeeManagement.Application\bin\Debug\net8.0\EmployeeManagement.Domain.dll
+D:\Melior\EmployeeManagement.Application\bin\Debug\net8.0\EmployeeManagement.Domain.pdb
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.csproj.AssemblyReference.cache
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.GeneratedMSBuildEditorConfig.editorconfig
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.AssemblyInfoInputs.cache
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.AssemblyInfo.cs
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.csproj.CoreCompileInputs.cache
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\Employee.16DA35CB.Up2Date
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.dll
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\refint\EmployeeManagement.Application.dll
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.pdb
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\ref\EmployeeManagement.Application.dll
