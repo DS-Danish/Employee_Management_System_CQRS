@@ -9,3 +9,4 @@ D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.d
 D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\refint\EmployeeManagement.Domain.dll
 D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.pdb
 D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\ref\EmployeeManagement.Domain.dll
+D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.sourcelink.json

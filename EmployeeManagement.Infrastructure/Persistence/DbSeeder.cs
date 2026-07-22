@@ -100,35 +100,68 @@ public static class DbSeeder
         ApplicationDbContext context,
         CancellationToken cancellationToken)
     {
+        List<Guid> departmentIds = await context.Departments
+            .Select(department => department.Id)
+            .ToListAsync(cancellationToken);
+
+        if (departmentIds.Count == 0)
+        {
+            return;
+        }
+
+        List<Employee> employeesWithoutDepartment =
+            await context.Employees
+                .Where(employee =>
+                    employee.DepartmentId == null)
+                .ToListAsync(cancellationToken);
+
+        var assignmentFaker = new Faker();
+
+        foreach (Employee employee in employeesWithoutDepartment)
+        {
+            Guid departmentId =
+                assignmentFaker.PickRandom(departmentIds);
+
+            employee.AssignDepartment(departmentId);
+        }
+
         int existingCount = await context.Employees
             .CountAsync(cancellationToken);
 
         int recordsToCreate = 20 - existingCount;
 
-        if (recordsToCreate <= 0)
+        if (recordsToCreate > 0)
         {
-            return;
+            var faker = new Faker<Employee>()
+                .CustomInstantiator(f =>
+                {
+                    Guid departmentId =
+                        f.PickRandom(departmentIds);
+
+                    return new Employee(
+                        f.Name.FirstName(),
+                        f.Name.LastName(),
+                        f.Internet.Email()
+                            .Trim()
+                            .ToLowerInvariant(),
+                        new Address(
+                            f.Address.StreetAddress(),
+                            f.Address.City(),
+                            "Pakistan",
+                            f.Address.ZipCode()),
+                        departmentId);
+                });
+
+            List<Employee> employees =
+                faker.Generate(recordsToCreate);
+
+            await context.Employees.AddRangeAsync(
+                employees,
+                cancellationToken);
         }
 
-        var faker = new Faker<Employee>()
-            .CustomInstantiator(f =>
-                new Employee(
-                    f.Name.FirstName(),
-                    f.Name.LastName(),
-                    f.Internet.Email(),
-                    new Address(
-                        f.Address.StreetAddress(),
-                        f.Address.City(),
-                        "Pakistan",
-                        f.Address.ZipCode())));
-
-        List<Employee> employees = faker.Generate(recordsToCreate);
-
-        await context.Employees.AddRangeAsync(
-            employees,
+        await context.SaveChangesAsync(
             cancellationToken);
-
-        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task SeedEmployeeDetailsAsync(

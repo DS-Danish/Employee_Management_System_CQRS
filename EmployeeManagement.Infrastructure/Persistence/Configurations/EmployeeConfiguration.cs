@@ -29,6 +29,9 @@ public sealed class EmployeeConfiguration
         builder.Property(employee => employee.CreatedAtUtc)
             .IsRequired();
 
+        builder.Property(employee => employee.DepartmentId)
+            .IsRequired(false);
+
         builder.HasIndex(employee => employee.Email)
             .IsUnique();
 
@@ -37,6 +40,8 @@ public sealed class EmployeeConfiguration
             employee.FirstName,
             employee.LastName
         });
+
+        builder.HasIndex(employee => employee.DepartmentId);
 
         builder.OwnsOne(
             employee => employee.Address,
@@ -67,5 +72,10 @@ public sealed class EmployeeConfiguration
 
         builder.Navigation(employee => employee.Address)
             .IsRequired();
+
+        builder.HasOne(employee => employee.Department)
+            .WithMany()
+            .HasForeignKey(employee => employee.DepartmentId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

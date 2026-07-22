@@ -9,5 +9,6 @@ public sealed record CreateEmployee(
     string Street,
     string City,
     string Country,
-    string PostalCode
+    string PostalCode,
+    Guid? DepartmentId
 ) : IRequest<Guid>;

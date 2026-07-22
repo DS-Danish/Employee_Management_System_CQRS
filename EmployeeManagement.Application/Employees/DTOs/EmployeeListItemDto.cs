@@ -4,4 +4,6 @@ public sealed record EmployeeListItemDto(
     Guid Id,
     string FullName,
     string Email,
-    string City);
+    string City,
+    Guid? DepartmentId,
+    string? DepartmentName);

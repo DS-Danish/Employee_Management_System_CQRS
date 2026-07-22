@@ -47,6 +47,24 @@ public sealed class UpdateEmployeeCommandHandler
                 "Another employee is already using this email.");
         }
 
+        if (request.DepartmentId.HasValue)
+        {
+            bool departmentExists =
+                await _dbContext.Departments
+                    .AsNoTracking()
+                    .AnyAsync(
+                        department =>
+                            department.Id ==
+                            request.DepartmentId.Value,
+                        cancellationToken);
+
+            if (!departmentExists)
+            {
+                throw new InvalidOperationException(
+                    "The selected department does not exist.");
+            }
+        }
+
         Address address = new(
             request.Street.Trim(),
             request.City.Trim(),
@@ -57,9 +75,11 @@ public sealed class UpdateEmployeeCommandHandler
             request.FirstName.Trim(),
             request.LastName.Trim(),
             normalizedEmail,
-            address);
+            address,
+            request.DepartmentId);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
         return true;
     }

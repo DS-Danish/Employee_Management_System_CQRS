@@ -13,3 +13,4 @@ D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.App
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\refint\EmployeeManagement.Application.dll
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.pdb
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\ref\EmployeeManagement.Application.dll
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.sourcelink.json

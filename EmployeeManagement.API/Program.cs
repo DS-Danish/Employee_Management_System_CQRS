@@ -6,15 +6,28 @@ using Microsoft.EntityFrameworkCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-// Register services
+const string ReactCorsPolicy = "ReactFrontend";
+
 builder.Services.AddControllers();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(
+        ReactCorsPolicy,
+        policy =>
+        {
+            policy
+                .WithOrigins("http://localhost:5173")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+});
+
 WebApplication app = builder.Build();
 
-// Apply migrations and seed database
 using (IServiceScope scope = app.Services.CreateScope())
 {
     ApplicationDbContext db =
@@ -24,13 +37,12 @@ using (IServiceScope scope = app.Services.CreateScope())
     await DbSeeder.SeedAsync(db);
 }
 
-// Global exception handling
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// Redirect HTTP to HTTPS
 app.UseHttpsRedirection();
 
-// Map API controllers
+app.UseCors(ReactCorsPolicy);
+
 app.MapControllers();
 
 app.Run();

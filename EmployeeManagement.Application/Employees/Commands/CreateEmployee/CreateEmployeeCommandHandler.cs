@@ -27,13 +27,31 @@ public sealed class CreateEmployeeCommandHandler
         bool exists = await _dbContext.Employees
             .AsNoTracking()
             .AnyAsync(
-                x => x.Email == normalizedEmail,
+                employee => employee.Email == normalizedEmail,
                 cancellationToken);
 
         if (exists)
         {
             throw new InvalidOperationException(
                 "Employee with this email already exists.");
+        }
+
+        if (request.DepartmentId.HasValue)
+        {
+            bool departmentExists =
+                await _dbContext.Departments
+                    .AsNoTracking()
+                    .AnyAsync(
+                        department =>
+                            department.Id ==
+                            request.DepartmentId.Value,
+                        cancellationToken);
+
+            if (!departmentExists)
+            {
+                throw new InvalidOperationException(
+                    "The selected department does not exist.");
+            }
         }
 
         Address address = new(
@@ -46,13 +64,15 @@ public sealed class CreateEmployeeCommandHandler
             request.FirstName.Trim(),
             request.LastName.Trim(),
             normalizedEmail,
-            address);
+            address,
+            request.DepartmentId);
 
         await _dbContext.Employees.AddAsync(
             employee,
             cancellationToken);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
         return employee.Id;
     }

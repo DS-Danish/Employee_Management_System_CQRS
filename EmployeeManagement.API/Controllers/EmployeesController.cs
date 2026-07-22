@@ -65,26 +65,29 @@ public sealed class EmployeesController : ControllerBase
         return Ok(employee);
     }
 
-    [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(
-        Guid id,
-        UpdateEmployeeRequest request,
-        CancellationToken cancellationToken)
-    {
-        var command = new UpdateEmployee(
-            id,
-            request.FirstName,
-            request.LastName,
-            request.Email,
-            request.Street,
-            request.City,
-            request.Country,
-            request.PostalCode);
+        [HttpPut("{id:guid}")]
+        public async Task<IActionResult> Update(
+            Guid id,
+            UpdateEmployeeRequest request,
+            CancellationToken cancellationToken)
+        {   
+            var command = new UpdateEmployee(
+                id,
+                request.FirstName,
+                request.LastName,
+                request.Email,
+                request.Street,
+                request.City,
+                request.Country,
+                request.PostalCode,
+                request.DepartmentId);
 
-        bool updated = await _sender.Send(command, cancellationToken);
+            bool updated = await _sender.Send(
+                command,
+                cancellationToken);
 
         return updated ? NoContent() : NotFound();
-    }
+        }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
@@ -106,4 +109,5 @@ public sealed record UpdateEmployeeRequest(
     string Street,
     string City,
     string Country,
-    string PostalCode);
+    string PostalCode,
+    Guid? DepartmentId);

@@ -24,15 +24,17 @@ public sealed class GetEmployeeDetailQueryHandler
     {
         return await _dbContext.EmployeeDetails
             .AsNoTracking()
-            .Where(x => x.EmployeeId == request.EmployeeId)
-            .Select(x => new EmployeeDetailDto(
-                x.Id,
-                x.EmployeeId,
-                x.Cnic,
-                x.PhoneNumber,
-                x.DateOfBirth,
-                x.Gender,
-                x.CreatedAtUtc))
+            .Where(detail =>
+                detail.EmployeeId == request.EmployeeId)
+
+            .Select(detail => new EmployeeDetailDto(
+                detail.Id,
+                detail.EmployeeId,
+                detail.Cnic,
+                detail.PhoneNumber,
+                detail.DateOfBirth,
+                detail.Gender,
+                detail.CreatedAtUtc))
             .SingleOrDefaultAsync(cancellationToken);
     }
 }

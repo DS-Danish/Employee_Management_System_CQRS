@@ -10,16 +10,17 @@ public sealed class Employee
         string firstName,
         string lastName,
         string email,
-        Address address)
+        Address address,
+        Guid? departmentId = null)
     {
         Id = Guid.NewGuid();
         FirstName = firstName;
         LastName = lastName;
         Email = email;
         Address = address;
+        DepartmentId = departmentId;
         CreatedAtUtc = DateTime.UtcNow;
     }
-
     public Guid Id { get; private set; }
 
     public string FirstName { get; private set; } = string.Empty;
@@ -30,17 +31,28 @@ public sealed class Employee
 
     public Address Address { get; private set; } = null!;
 
+    public Guid? DepartmentId { get; private set; }
+
+    public Department? Department { get; private set; }
+
     public DateTime CreatedAtUtc { get; private set; }
 
     public void Update(
         string firstName,
         string lastName,
         string email,
-        Address address)
+        Address address,
+        Guid? DepartmentId)
     {
         FirstName = firstName;
         LastName = lastName;
         Email = email;
         Address = address;
+        DepartmentId = DepartmentId;
+    }
+
+    public void AssignDepartment(Guid? departmentId)
+    {
+        DepartmentId = departmentId;
     }
 }

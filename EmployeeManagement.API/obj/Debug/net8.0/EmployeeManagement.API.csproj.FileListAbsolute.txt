@@ -182,3 +182,4 @@ D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\refint\EmployeeManagement.API.
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.pdb
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.genruntimeconfig.cache
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\ref\EmployeeManagement.API.dll
+D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.sourcelink.json

@@ -10,5 +10,6 @@ public sealed record UpdateEmployee(
     string Street,
     string City,
     string Country,
-    string PostalCode
+    string PostalCode,
+    Guid? DepartmentId
 ) : IRequest<bool>;

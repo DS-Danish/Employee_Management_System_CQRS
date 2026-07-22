@@ -17,3 +17,4 @@ D:\Melior\EmployeeManagement.Infrastructure\obj\Debug\net8.0\refint\EmployeeMana
 D:\Melior\EmployeeManagement.Infrastructure\obj\Debug\net8.0\EmployeeManagement.Infrastructure.pdb
 D:\Melior\EmployeeManagement.Infrastructure\obj\Debug\net8.0\EmployeeManagement.Infrastructure.genruntimeconfig.cache
 D:\Melior\EmployeeManagement.Infrastructure\obj\Debug\net8.0\ref\EmployeeManagement.Infrastructure.dll
+D:\Melior\EmployeeManagement.Infrastructure\obj\Debug\net8.0\EmployeeManagement.Infrastructure.sourcelink.json
