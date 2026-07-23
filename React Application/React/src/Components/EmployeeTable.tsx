@@ -1,10 +1,8 @@
-import DeleteIcon from "@mui/icons-material/Delete";
+import type { ReactNode } from "react";
 
 import {
   Box,
-  Chip,
   CircularProgress,
-  IconButton,
   Paper,
   Table,
   TableBody,
@@ -12,179 +10,147 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Tooltip,
   Typography,
 } from "@mui/material";
 
 import type { Employee } from "../Types/employee";
+import type { Project } from "../Types/project";
 
 interface EmployeeTableProps {
   employees: Employee[];
   loading: boolean;
   deletingEmployeeId: string | null;
-  onDelete: (employee: Employee) => Promise<void>;
-}
-
-function getEmployeeName(employee: Employee): string {
-  return employee.fullName?.trim() || "—";
-}
-
-function getDepartmentName(employee: Employee): string {
-  return (
-    employee.department?.name?.trim() ||
-    employee.departmentName?.trim() ||
-    "Not assigned"
-  );
-}
-
-function getPhoneNumber(employee: Employee): string {
-  return employee.employeeDetail?.phoneNumber?.trim() || "—";
-}
-
-function getGender(employee: Employee): string {
-  return employee.employeeDetail?.gender?.trim() || "—";
+  renderActions: (employee: Employee) => ReactNode;
 }
 
 export function EmployeeTable({
   employees,
+  loading,
   deletingEmployeeId,
-  onDelete,
+  renderActions,
 }: EmployeeTableProps) {
+  if (loading) {
+    return (
+      <Paper
+        variant="outlined"
+        sx={{
+          alignItems: "center",
+          display: "flex",
+          justifyContent: "center",
+          minHeight: 250,
+        }}
+      >
+        <CircularProgress />
+      </Paper>
+    );
+  }
 
   if (employees.length === 0) {
     return (
-      <Paper sx={{ p: 5, textAlign: "center" }}>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 5,
+          textAlign: "center",
+        }}
+      >
+        <Typography
+          variant="h6"
+          sx={{ mb: 1 }}
+        >
+          No employees found
+        </Typography>
+
         <Typography color="text.secondary">
-          No employees were found.
+          Create an employee to display it here.
         </Typography>
       </Paper>
     );
   }
 
   return (
-    <TableContainer component={Paper}>
+    <TableContainer component={Paper} variant="outlined">
       <Table>
         <TableHead>
           <TableRow>
-            <TableCell>
-              <strong>Sr. No.</strong>
-            </TableCell>
-
-            <TableCell>
-              <strong>Name</strong>
-            </TableCell>
-
-            <TableCell>
-              <strong>Email</strong>
-            </TableCell>
-
-            <TableCell>
-              <strong>Department</strong>
-            </TableCell>
-
-            <TableCell>
-              <strong>Projects</strong>
-            </TableCell>
-
-            <TableCell>
-              <strong>Phone</strong>
-            </TableCell>
-
-            <TableCell>
-              <strong>Gender</strong>
-            </TableCell>
-
-            <TableCell align="right">
-              <strong>Actions</strong>
-            </TableCell>
+            <TableCell width={60}>Sr. No</TableCell>
+            <TableCell>Employee</TableCell>
+            <TableCell>Email</TableCell>
+            <TableCell>Department</TableCell>
+            <TableCell>City</TableCell>
+            <TableCell>Projects</TableCell>
+            <TableCell>Phone</TableCell>
+            <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
 
         <TableBody>
           {employees.map(
             (employee: Employee, index: number) => {
-              const isDeleting =
-                deletingEmployeeId === employee.id;
+              const projectNames: string =
+                employee.projects
+                  ?.map(
+                    (project: Project): string =>
+                      project.name,
+                  )
+                  .join(", ") || "Not assigned";
+
+              const departmentName: string =
+                employee.department?.name ??
+                employee.departmentName ??
+                "Not assigned";
+
+              const phoneNumber: string =
+                employee.employeeDetail?.phoneNumber ||
+                "Not provided";
 
               return (
-                <TableRow hover key={employee.id}>
+                <TableRow
+                  key={employee.id}
+                  hover
+                  sx={{
+                    opacity:
+                      deletingEmployeeId === employee.id
+                        ? 0.5
+                        : 1,
+                  }}
+                >
                   <TableCell>{index + 1}</TableCell>
 
                   <TableCell>
-                    {getEmployeeName(employee)}
-                  </TableCell>
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600 }}
+                      >
+                        {employee.fullName}
+                      </Typography>
 
-                  <TableCell>
-                    {employee.email ?? "—"}
-                  </TableCell>
-
-                  <TableCell>
-                    {getDepartmentName(employee)}
-                  </TableCell>
-
-                  <TableCell>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: 0.5,
-                      }}
-                    >
-                      {employee.projects &&
-                      employee.projects.length > 0 ? (
-                        employee.projects.map(
-                          (project, projectIndex) => (
-                            <Chip
-                              key={
-                                project.id ??
-                                `${employee.id}-${projectIndex}`
-                              }
-                              label={
-                                project.name ??
-                                "Unnamed project"
-                              }
-                              size="small"
-                            />
-                          ),
-                        )
-                      ) : (
+                      {employee.employeeDetail?.cnic && (
                         <Typography
-                          component="span"
+                          variant="caption"
                           color="text.secondary"
-                          variant="body2"
                         >
-                          Not assigned
+                          {employee.employeeDetail.cnic}
                         </Typography>
                       )}
                     </Box>
                   </TableCell>
 
-                  <TableCell>
-                    {getPhoneNumber(employee)}
-                  </TableCell>
+                  <TableCell>{employee.email}</TableCell>
 
                   <TableCell>
-                    {getGender(employee)}
+                    {departmentName}
                   </TableCell>
+
+                  <TableCell>{employee.city}</TableCell>
+
+                  <TableCell>{projectNames}</TableCell>
+
+                  <TableCell>{phoneNumber}</TableCell>
 
                   <TableCell align="right">
-                    {isDeleting ? (
-                      <CircularProgress size={22} />
-                    ) : (
-                      <Tooltip title="Delete employee">
-                        <IconButton
-                          aria-label={`Delete ${getEmployeeName(
-                            employee,
-                          )}`}
-                          color="error"
-                          onClick={() =>
-                            void onDelete(employee)
-                          }
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+                    {renderActions(employee)}
                   </TableCell>
                 </TableRow>
               );

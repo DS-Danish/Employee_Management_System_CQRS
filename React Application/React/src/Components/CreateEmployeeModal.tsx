@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+  type FormEvent,
+} from "react";
 
 import CloseIcon from "@mui/icons-material/Close";
 
@@ -35,11 +39,13 @@ import {
 import { assignEmployeeToProject } from "../services/employeeProjectService";
 
 import type { Department } from "../Types/department";
+
 import type {
   CreateEmployeeDetailRequest,
   CreateEmployeeFormValues,
   CreateEmployeeRequest,
 } from "../Types/employee";
+
 import type { Project } from "../Types/project";
 
 interface CreateEmployeeModalProps {
@@ -79,7 +85,9 @@ export function CreateEmployeeModal({
   const [values, setValues] =
     useState<CreateEmployeeFormValues>(initialValues);
 
-  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [submitting, setSubmitting] =
+    useState<boolean>(false);
+
   const [error, setError] = useState<string>("");
 
   useEffect(() => {
@@ -89,14 +97,20 @@ export function CreateEmployeeModal({
     }
   }, [open]);
 
-  function updateField<K extends keyof CreateEmployeeFormValues>(
+  function updateField<
+    K extends keyof CreateEmployeeFormValues,
+  >(
     field: K,
     value: CreateEmployeeFormValues[K],
   ): void {
-    setValues((currentValues) => ({
-      ...currentValues,
-      [field]: value,
-    }));
+    setValues(
+      (
+        currentValues: CreateEmployeeFormValues,
+      ): CreateEmployeeFormValues => ({
+        ...currentValues,
+        [field]: value,
+      }),
+    );
   }
 
   function handleProjectChange(
@@ -137,11 +151,24 @@ export function CreateEmployeeModal({
       return "City is required.";
     }
 
+    if (!values.country.trim()) {
+      return "Country is required.";
+    }
+
     return null;
   }
 
-  async function handleSubmit(): Promise<void> {
-    const validationError = validateForm();
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ): Promise<void> {
+    event.preventDefault();
+
+    if (submitting) {
+      return;
+    }
+
+    const validationError: string | null =
+      validateForm();
 
     if (validationError) {
       setError(validationError);
@@ -165,9 +192,10 @@ export function CreateEmployeeModal({
         departmentId: values.departmentId || null,
       };
 
-      const employeeId = await createEmployee(employeeRequest);
+      const employeeId: string =
+        await createEmployee(employeeRequest);
 
-      const hasEmployeeDetail = Boolean(
+      const hasEmployeeDetail: boolean = Boolean(
         values.cnic.trim() ||
           values.phoneNumber.trim() ||
           values.dateOfBirth ||
@@ -182,18 +210,25 @@ export function CreateEmployeeModal({
           gender: values.gender,
         };
 
-        await createEmployeeDetail(employeeId, detailRequest);
+        await createEmployeeDetail(
+          employeeId,
+          detailRequest,
+        );
       }
 
       await Promise.all(
-        values.projectIds.map((projectId) =>
-          assignEmployeeToProject(employeeId, projectId),
+        values.projectIds.map(
+          (projectId: string): Promise<void> =>
+            assignEmployeeToProject(
+              employeeId,
+              projectId,
+            ),
         ),
       );
 
       await onCreated();
     } catch (caughtError: unknown) {
-      const message =
+      const message: string =
         caughtError instanceof Error
           ? caughtError.message
           : "Employee creation failed.";
@@ -204,10 +239,20 @@ export function CreateEmployeeModal({
     }
   }
 
+  function handleClose(): void {
+    if (submitting) {
+      return;
+    }
+
+    setValues(initialValues);
+    setError("");
+    onClose();
+  }
+
   return (
     <Dialog
       open={open}
-      onClose={submitting ? undefined : onClose}
+      onClose={handleClose}
       fullWidth
       maxWidth="md"
     >
@@ -225,308 +270,358 @@ export function CreateEmployeeModal({
 
           <IconButton
             disabled={submitting}
-            onClick={onClose}
-            aria-label="Close"
+            onClick={handleClose}
+            aria-label="Close create employee dialog"
           >
             <CloseIcon />
           </IconButton>
         </Box>
       </DialogTitle>
 
-      <DialogContent dividers>
-        <Stack spacing={3}>
-          {error && <Alert severity="error">{error}</Alert>}
+      <Box
+        component="form"
+        onSubmit={(event) => void handleSubmit(event)}
+      >
+        <DialogContent dividers>
+          <Stack spacing={3}>
+            {error && (
+              <Alert severity="error">{error}</Alert>
+            )}
 
-          <Typography
-            component="h2"
-            variant="subtitle1"
-            sx={{ fontWeight: 600 }}
-          >
-            Basic Information
-          </Typography>
+            <Typography
+              component="h2"
+              variant="subtitle1"
+              sx={{ fontWeight: 600 }}
+            >
+              Basic Information
+            </Typography>
 
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                md: "1fr 1fr",
-              },
-              gap: 2,
-            }}
-          >
-            <TextField
-              label="First Name"
-              required
-              value={values.firstName}
-              onChange={(event) =>
-                updateField("firstName", event.target.value)
-              }
-            />
-
-            <TextField
-              label="Last Name"
-              required
-              value={values.lastName}
-              onChange={(event) =>
-                updateField("lastName", event.target.value)
-              }
-            />
-
-            <TextField
-              label="Email"
-              required
-              type="email"
-              value={values.email}
-              onChange={(event) =>
-                updateField("email", event.target.value)
-              }
-            />
-
-            <FormControl>
-              <InputLabel id="department-label">
-                Department
-              </InputLabel>
-
-              <Select
-                labelId="department-label"
-                label="Department"
-                value={values.departmentId}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "1fr 1fr",
+                },
+                gap: 2,
+              }}
+            >
+              <TextField
+                label="First Name"
+                required
+                value={values.firstName}
                 onChange={(event) =>
                   updateField(
-                    "departmentId",
+                    "firstName",
                     event.target.value,
                   )
                 }
-              >
-                <MenuItem value="">
-                  <em>Not assigned</em>
-                </MenuItem>
-
-                {departments.map((department) => (
-                  <MenuItem
-                    key={department.id}
-                    value={department.id}
-                  >
-                    {department.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl
-              sx={{ gridColumn: { md: "1 / -1" } }}
-            >
-              <InputLabel id="projects-label">
-                Projects
-              </InputLabel>
-
-              <Select<string[]>
-                labelId="projects-label"
-                multiple
-                value={values.projectIds}
-                onChange={handleProjectChange}
-                input={<OutlinedInput label="Projects" />}
-                renderValue={(selectedProjectIds) =>
-                  selectedProjectIds
-                    .map(
-                      (projectId) =>
-                        projects.find(
-                          (project) =>
-                            project.id === projectId,
-                        )?.name ?? projectId,
-                    )
-                    .join(", ")
-                }
-              >
-                {projects.map((project) => (
-                  <MenuItem
-                    key={project.id}
-                    value={project.id}
-                  >
-                    <Checkbox
-                      checked={values.projectIds.includes(
-                        project.id,
-                      )}
-                    />
-
-                    <ListItemText primary={project.name} />
-                  </MenuItem>
-                ))}
-              </Select>
-
-              <FormHelperText>
-                Multiple projects can be selected.
-              </FormHelperText>
-            </FormControl>
-          </Box>
-
-          <Typography
-            component="h2"
-            variant="subtitle1"
-            sx={{ fontWeight: 600 }}
-          >
-            Employee Details
-          </Typography>
-
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                md: "1fr 1fr",
-              },
-              gap: 2,
-            }}
-          >
-            <TextField
-              label="CNIC"
-              placeholder="35202-1234567-1"
-              value={values.cnic}
-              onChange={(event) =>
-                updateField("cnic", event.target.value)
-              }
-            />
-
-            <TextField
-              label="Phone Number"
-              placeholder="03001234567"
-              value={values.phoneNumber}
-              onChange={(event) =>
-                updateField(
-                  "phoneNumber",
-                  event.target.value,
-                )
-              }
-            />
-
-            <TextField
-              label="Date of Birth"
-              type="date"
-              value={values.dateOfBirth}
-              onChange={(event) =>
-                updateField(
-                  "dateOfBirth",
-                  event.target.value,
-                )
-              }
-              slotProps={{
-                inputLabel: {
-                  shrink: true,
-                },
-                htmlInput: {
-                  max: new Date()
-                    .toISOString()
-                    .split("T")[0],
-                },
-              }}
-            />
-
-            <FormControl>
-              <InputLabel id="gender-label">
-                Gender
-              </InputLabel>
-
-              <Select
-                labelId="gender-label"
-                label="Gender"
-                value={values.gender}
-                onChange={(event) =>
-                  updateField("gender", event.target.value)
-                }
-              >
-                <MenuItem value="">
-                  <em>Select gender</em>
-                </MenuItem>
-
-                <MenuItem value="Male">Male</MenuItem>
-                <MenuItem value="Female">Female</MenuItem>
-                <MenuItem value="Other">Other</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-
-          <Typography
-            component="h2"
-            variant="subtitle1"
-            sx={{ fontWeight: 600 }}
-          >
-            Address
-          </Typography>
-
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                md: "1fr 1fr",
-              },
-              gap: 2,
-            }}
-          >
-            <TextField
-              label="Street"
-              required
-              value={values.street}
-              onChange={(event) =>
-                updateField("street", event.target.value)
-              }
-            />
-
-            <TextField
-              label="City"
-              required
-              value={values.city}
-              onChange={(event) =>
-                updateField("city", event.target.value)
-              }
-            />
-
-            <TextField
-              label="Country"
-              value={values.country}
-              onChange={(event) =>
-                updateField("country", event.target.value)
-              }
-            />
-
-            <TextField
-              label="Postal Code"
-              value={values.postalCode}
-              onChange={(event) =>
-                updateField(
-                  "postalCode",
-                  event.target.value,
-                )
-              }
-            />
-          </Box>
-        </Stack>
-      </DialogContent>
-
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button disabled={submitting} onClick={onClose}>
-          Cancel
-        </Button>
-
-        <Button
-          variant="contained"
-          disabled={submitting}
-          onClick={() => void handleSubmit()}
-          startIcon={
-            submitting ? (
-              <CircularProgress
-                size={18}
-                color="inherit"
               />
-            ) : undefined
-          }
-        >
-          {submitting
-            ? "Creating..."
-            : "Create Employee"}
-        </Button>
-      </DialogActions>
+
+              <TextField
+                label="Last Name"
+                required
+                value={values.lastName}
+                onChange={(event) =>
+                  updateField(
+                    "lastName",
+                    event.target.value,
+                  )
+                }
+              />
+
+              <TextField
+                label="Email"
+                required
+                type="email"
+                value={values.email}
+                onChange={(event) =>
+                  updateField(
+                    "email",
+                    event.target.value,
+                  )
+                }
+              />
+
+              <FormControl>
+                <InputLabel id="create-department-label">
+                  Department
+                </InputLabel>
+
+                <Select
+                  labelId="create-department-label"
+                  label="Department"
+                  value={values.departmentId}
+                  onChange={(event) =>
+                    updateField(
+                      "departmentId",
+                      event.target.value,
+                    )
+                  }
+                >
+                  <MenuItem value="">
+                    <em>Not assigned</em>
+                  </MenuItem>
+
+                  {departments.map(
+                    (department: Department) => (
+                      <MenuItem
+                        key={department.id}
+                        value={department.id}
+                      >
+                        {department.name}
+                      </MenuItem>
+                    ),
+                  )}
+                </Select>
+              </FormControl>
+
+              <FormControl
+                sx={{
+                  gridColumn: {
+                    md: "1 / -1",
+                  },
+                }}
+              >
+                <InputLabel id="create-projects-label">
+                  Projects
+                </InputLabel>
+
+                <Select<string[]>
+                  labelId="create-projects-label"
+                  multiple
+                  value={values.projectIds}
+                  onChange={handleProjectChange}
+                  input={
+                    <OutlinedInput label="Projects" />
+                  }
+                  renderValue={(
+                    selectedProjectIds: string[],
+                  ): string =>
+                    selectedProjectIds
+                      .map(
+                        (projectId: string): string =>
+                          projects.find(
+                            (project: Project): boolean =>
+                              project.id === projectId,
+                          )?.name ?? projectId,
+                      )
+                      .join(", ")
+                  }
+                >
+                  {projects.map((project: Project) => (
+                    <MenuItem
+                      key={project.id}
+                      value={project.id}
+                    >
+                      <Checkbox
+                        checked={values.projectIds.includes(
+                          project.id,
+                        )}
+                      />
+
+                      <ListItemText
+                        primary={project.name}
+                      />
+                    </MenuItem>
+                  ))}
+                </Select>
+
+                <FormHelperText>
+                  Multiple projects can be selected.
+                </FormHelperText>
+              </FormControl>
+            </Box>
+
+            <Typography
+              component="h2"
+              variant="subtitle1"
+              sx={{ fontWeight: 600 }}
+            >
+              Employee Details
+            </Typography>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "1fr 1fr",
+                },
+                gap: 2,
+              }}
+            >
+              <TextField
+                label="CNIC"
+                placeholder="35202-1234567-1"
+                value={values.cnic}
+                onChange={(event) =>
+                  updateField(
+                    "cnic",
+                    event.target.value,
+                  )
+                }
+              />
+
+              <TextField
+                label="Phone Number"
+                placeholder="03001234567"
+                value={values.phoneNumber}
+                onChange={(event) =>
+                  updateField(
+                    "phoneNumber",
+                    event.target.value,
+                  )
+                }
+              />
+
+              <TextField
+                label="Date of Birth"
+                type="date"
+                value={values.dateOfBirth}
+                onChange={(event) =>
+                  updateField(
+                    "dateOfBirth",
+                    event.target.value,
+                  )
+                }
+                slotProps={{
+                  inputLabel: {
+                    shrink: true,
+                  },
+                  htmlInput: {
+                    max: new Date()
+                      .toISOString()
+                      .split("T")[0],
+                  },
+                }}
+              />
+
+              <FormControl>
+                <InputLabel id="create-gender-label">
+                  Gender
+                </InputLabel>
+
+                <Select
+                  labelId="create-gender-label"
+                  label="Gender"
+                  value={values.gender}
+                  onChange={(event) =>
+                    updateField(
+                      "gender",
+                      event.target.value,
+                    )
+                  }
+                >
+                  <MenuItem value="">
+                    <em>Select gender</em>
+                  </MenuItem>
+
+                  <MenuItem value="Male">Male</MenuItem>
+                  <MenuItem value="Female">
+                    Female
+                  </MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Typography
+              component="h2"
+              variant="subtitle1"
+              sx={{ fontWeight: 600 }}
+            >
+              Address
+            </Typography>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "1fr 1fr",
+                },
+                gap: 2,
+              }}
+            >
+              <TextField
+                label="Street"
+                required
+                value={values.street}
+                onChange={(event) =>
+                  updateField(
+                    "street",
+                    event.target.value,
+                  )
+                }
+              />
+
+              <TextField
+                label="City"
+                required
+                value={values.city}
+                onChange={(event) =>
+                  updateField(
+                    "city",
+                    event.target.value,
+                  )
+                }
+              />
+
+              <TextField
+                label="Country"
+                required
+                value={values.country}
+                onChange={(event) =>
+                  updateField(
+                    "country",
+                    event.target.value,
+                  )
+                }
+              />
+
+              <TextField
+                label="Postal Code"
+                value={values.postalCode}
+                onChange={(event) =>
+                  updateField(
+                    "postalCode",
+                    event.target.value,
+                  )
+                }
+              />
+            </Box>
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button
+            type="button"
+            disabled={submitting}
+            onClick={handleClose}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={submitting}
+            startIcon={
+              submitting ? (
+                <CircularProgress
+                  size={18}
+                  color="inherit"
+                />
+              ) : undefined
+            }
+          >
+            {submitting
+              ? "Creating..."
+              : "Create Employee"}
+          </Button>
+        </DialogActions>
+      </Box>
     </Dialog>
   );
 }

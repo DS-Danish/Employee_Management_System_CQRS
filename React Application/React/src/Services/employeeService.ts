@@ -4,8 +4,10 @@ import type {
   CreateEmployeeDetailRequest,
   CreateEmployeeRequest,
   Employee,
+  EmployeeByIdResponse,
   EmployeeDetail,
   EmployeeListResponse,
+  UpdateEmployeeRequest,
 } from "../Types/employee";
 
 export async function getEmployees(): Promise<Employee[]> {
@@ -15,6 +17,14 @@ export async function getEmployees(): Promise<Employee[]> {
     );
 
   return response.items;
+}
+
+export function getEmployeeById(
+  employeeId: string,
+): Promise<EmployeeByIdResponse> {
+  return apiRequest<EmployeeByIdResponse>(
+    `/employees/${employeeId}`,
+  );
 }
 
 export async function createEmployee(
@@ -27,11 +37,31 @@ export async function createEmployee(
     body: JSON.stringify(request),
   });
 
-  if (typeof response === "string") {
-    return response;
+  const employeeId: string =
+    typeof response === "string"
+      ? response
+      : response.id;
+
+  if (!employeeId) {
+    throw new Error(
+      "The employee API did not return an employee ID.",
+    );
   }
 
-  return response.id;
+  return employeeId;
+}
+
+export function updateEmployee(
+  employeeId: string,
+  request: UpdateEmployeeRequest,
+): Promise<void> {
+  return apiRequest<void>(
+    `/employees/${employeeId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(request),
+    },
+  );
 }
 
 export async function getEmployeeDetail(

@@ -24,6 +24,27 @@ export interface Employee {
   projects?: Project[];
 }
 
+export interface EmployeeByIdResponse {
+  id: string;
+
+  firstName: string;
+  lastName: string;
+  fullName?: string;
+
+  email: string;
+
+  street: string;
+  city: string;
+  country: string;
+  postalCode: string;
+
+  departmentId?: string | null;
+  departmentName?: string | null;
+
+  employeeDetail?: EmployeeDetail | null;
+  projects?: Project[];
+}
+
 export interface EmployeeListResponse {
   items: Employee[];
   pageNumber: number;
@@ -50,7 +71,34 @@ export interface CreateEmployeeFormValues {
   gender: string;
 }
 
+export interface EditEmployeeFormValues {
+  firstName: string;
+  lastName: string;
+  email: string;
+
+  street: string;
+  city: string;
+  country: string;
+  postalCode: string;
+
+  departmentId: string;
+  projectIds: string[];
+}
+
 export interface CreateEmployeeRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+
+  street: string;
+  city: string;
+  country: string;
+  postalCode: string;
+
+  departmentId: string | null;
+}
+
+export interface UpdateEmployeeRequest {
   firstName: string;
   lastName: string;
   email: string;
