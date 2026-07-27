@@ -1,15 +1,22 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using EmployeeManagement.Application.Authentication;
 using EmployeeManagement.Application.Common.Constants;
 using EmployeeManagement.Domain.Entities;
 using EmployeeManagement.Infrastructure.Identity;
 using EmployeeManagement.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace EmployeeManagement.API.Controllers;
 
 [ApiController]
+[AllowAnonymous]
 [Route("api/auth")]
 public sealed class AuthController : ControllerBase
 {
@@ -19,12 +26,127 @@ public sealed class AuthController : ControllerBase
     private readonly ApplicationDbContext
         _databaseContext;
 
+    private readonly JwtSettings
+        _jwtSettings;
+
     public AuthController(
         UserManager<ApplicationUser> userManager,
-        ApplicationDbContext databaseContext)
+        ApplicationDbContext databaseContext,
+        IOptions<JwtSettings> jwtOptions)
     {
         _userManager = userManager;
         _databaseContext = databaseContext;
+        _jwtSettings = jwtOptions.Value;
+    }
+
+    [HttpPost("login")]
+    [ProducesResponseType(
+        typeof(LoginResponse),
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(
+        StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(
+        StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<LoginResponse>>
+        Login(
+            [FromBody] LoginRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email) ||
+            string.IsNullOrWhiteSpace(request.Password))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Email and password are required."
+            });
+        }
+
+        string normalizedEmail =
+            request.Email
+                .Trim()
+                .ToLowerInvariant();
+
+        ApplicationUser? user =
+            await _userManager.FindByEmailAsync(
+                normalizedEmail);
+
+        if (user is null)
+        {
+            return Unauthorized(new
+            {
+                message =
+                    "Invalid email or password."
+            });
+        }
+
+        bool passwordIsValid =
+            await _userManager.CheckPasswordAsync(
+                user,
+                request.Password);
+
+        if (!passwordIsValid)
+        {
+            return Unauthorized(new
+            {
+                message =
+                    "Invalid email or password."
+            });
+        }
+
+        IList<string> roles =
+            await _userManager.GetRolesAsync(user);
+
+        if (roles.Count == 0)
+        {
+            return Unauthorized(new
+            {
+                message =
+                    "No role has been assigned to this account."
+            });
+        }
+
+        string role =
+            roles[0];
+
+        DateTime expiresAtUtc =
+            DateTime.UtcNow.AddMinutes(
+                _jwtSettings.ExpirationMinutes);
+
+        string token =
+            CreateJwtToken(
+                user,
+                roles,
+                expiresAtUtc);
+
+        var response =
+            new LoginResponse
+            {
+                Token =
+                    token,
+
+                ExpiresAtUtc =
+                    expiresAtUtc,
+
+                UserId =
+                    user.Id,
+
+                FullName =
+                    user.FullName,
+
+                Email =
+                    user.Email ?? normalizedEmail,
+
+                Role =
+                    role,
+
+                DepartmentId =
+                    user.DepartmentId,
+
+                EmployeeId =
+                    user.EmployeeId
+            };
+
+        return Ok(response);
     }
 
     [HttpPost("register")]
@@ -37,6 +159,42 @@ public sealed class AuthController : ControllerBase
         Register(
             [FromBody] RegisterRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.FullName))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Full name is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Email is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Password is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Role))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Role is required."
+            });
+        }
+
         string role =
             NormalizeRole(request.Role);
 
@@ -77,34 +235,36 @@ public sealed class AuthController : ControllerBase
         {
             return BadRequest(new
             {
-                message = validationError
+                message =
+                    validationError
             });
         }
 
-        var user = new ApplicationUser
-        {
-            FullName =
-                request.FullName.Trim(),
+        var user =
+            new ApplicationUser
+            {
+                FullName =
+                    request.FullName.Trim(),
 
-            Email =
-                normalizedEmail,
+                Email =
+                    normalizedEmail,
 
-            UserName =
-                normalizedEmail,
+                UserName =
+                    normalizedEmail,
 
-            EmailConfirmed =
-                true,
+                EmailConfirmed =
+                    true,
 
-            DepartmentId =
-                role == AppRoles.SuperAdmin
-                    ? null
-                    : request.DepartmentId,
+                DepartmentId =
+                    role == AppRoles.SuperAdmin
+                        ? null
+                        : request.DepartmentId,
 
-            EmployeeId =
-                role == AppRoles.Employee
-                    ? request.EmployeeId
-                    : null
-        };
+                EmployeeId =
+                    role == AppRoles.Employee
+                        ? request.EmployeeId
+                        : null
+            };
 
         IdentityResult createResult =
             await _userManager.CreateAsync(
@@ -146,30 +306,120 @@ public sealed class AuthController : ControllerBase
             });
         }
 
-        var response = new RegisterResponse
-        {
-            UserId =
-                user.Id,
+        var response =
+            new RegisterResponse
+            {
+                UserId =
+                    user.Id,
 
-            FullName =
-                user.FullName,
+                FullName =
+                    user.FullName,
 
-            Email =
-                user.Email!,
+                Email =
+                    user.Email!,
 
-            Role =
-                role,
+                Role =
+                    role,
 
-            DepartmentId =
-                user.DepartmentId,
+                DepartmentId =
+                    user.DepartmentId,
 
-            EmployeeId =
-                user.EmployeeId
-        };
+                EmployeeId =
+                    user.EmployeeId
+            };
 
         return StatusCode(
             StatusCodes.Status201Created,
             response);
+    }
+
+    private string CreateJwtToken(
+        ApplicationUser user,
+        IEnumerable<string> roles,
+        DateTime expiresAtUtc)
+    {
+        var claims =
+            new List<Claim>
+            {
+                new(
+                    JwtRegisteredClaimNames.Sub,
+                    user.Id),
+
+                new(
+                    JwtRegisteredClaimNames.Email,
+                    user.Email ?? string.Empty),
+
+                new(
+                    JwtRegisteredClaimNames.Jti,
+                    Guid.NewGuid().ToString()),
+
+                new(
+                    ClaimTypes.NameIdentifier,
+                    user.Id),
+
+                new(
+                    ClaimTypes.Name,
+                    user.FullName)
+            };
+
+        foreach (string role in roles)
+        {
+            claims.Add(
+                new Claim(
+                    ClaimTypes.Role,
+                    role));
+        }
+
+        if (user.DepartmentId.HasValue)
+        {
+            claims.Add(
+                new Claim(
+                    "departmentId",
+                    user.DepartmentId.Value
+                        .ToString()));
+        }
+
+        if (user.EmployeeId.HasValue)
+        {
+            claims.Add(
+                new Claim(
+                    "employeeId",
+                    user.EmployeeId.Value
+                        .ToString()));
+        }
+
+        var signingKey =
+            new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(
+                    _jwtSettings.Key));
+
+        var signingCredentials =
+            new SigningCredentials(
+                signingKey,
+                SecurityAlgorithms.HmacSha256);
+
+        var token =
+            new JwtSecurityToken(
+                issuer:
+                    _jwtSettings.Issuer,
+
+                audience:
+                    _jwtSettings.Audience,
+
+                claims:
+                    claims,
+
+                notBefore:
+                    DateTime.UtcNow,
+
+                expires:
+                    expiresAtUtc,
+
+                signingCredentials:
+                    signingCredentials);
+
+        return new JwtSecurityTokenHandler()
+            .WriteToken(token);
     }
 
     private async Task<string?>
@@ -250,7 +500,8 @@ public sealed class AuthController : ControllerBase
     private static string NormalizeRole(
         string role)
     {
-        return role.Trim()
+        return role
+            .Trim()
             .ToLowerInvariant() switch
         {
             "superadmin" =>

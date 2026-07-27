@@ -13,6 +13,7 @@ D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\FluentValidation.DependencyInj
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\Humanizer.dll
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\MediatR.dll
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\MediatR.Contracts.dll
+D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\Microsoft.AspNetCore.OpenApi.dll
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\Microsoft.Bcl.AsyncInterfaces.dll

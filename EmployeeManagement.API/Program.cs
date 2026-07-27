@@ -25,7 +25,9 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy
-                .WithOrigins("http://localhost:5173")
+                .WithOrigins(
+                    "http://localhost:5173",
+                    "http://localhost:5174")
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         });
@@ -40,28 +42,6 @@ using (IServiceScope scope =
     ApplicationDbContext databaseContext =
         scope.ServiceProvider
             .GetRequiredService<ApplicationDbContext>();
-
-    string serverName =
-        databaseContext.Database
-            .GetDbConnection()
-            .DataSource;
-
-    string databaseName =
-        databaseContext.Database
-            .GetDbConnection()
-            .Database;
-
-    Console.WriteLine(
-        "======================================");
-
-    Console.WriteLine(
-        $"SQL Server: {serverName}");
-
-    Console.WriteLine(
-        $"Database: {databaseName}");
-
-    Console.WriteLine(
-        "======================================");
 
     await databaseContext.Database.MigrateAsync();
 }
