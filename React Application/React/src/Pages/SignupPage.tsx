@@ -1,9 +1,6 @@
 import { useState } from "react";
 import type { SyntheticEvent } from "react";
-import {
-  Link,
-  useNavigate,
-} from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -18,7 +15,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { PersonAddOutlined as PersonAddOutlinedIcon } from "@mui/icons-material";
 
 type UserRole =
   | "SuperAdmin"
@@ -112,26 +108,17 @@ export default function SignupPage() {
       employeeId.trim();
 
     if (!normalizedFullName) {
-      setError(
-        "Full name is required.",
-      );
-
+      setError("Full name is required.");
       return;
     }
 
     if (!normalizedEmail) {
-      setError(
-        "Email is required.",
-      );
-
+      setError("Email is required.");
       return;
     }
 
     if (!password) {
-      setError(
-        "Password is required.",
-      );
-
+      setError("Password is required.");
       return;
     }
 
@@ -139,18 +126,13 @@ export default function SignupPage() {
       setError(
         "Password must contain at least 5 characters.",
       );
-
       return;
     }
 
-    if (
-      password !==
-      confirmPassword
-    ) {
+    if (password !== confirmPassword) {
       setError(
         "Password and confirm password do not match.",
       );
-
       return;
     }
 
@@ -161,7 +143,6 @@ export default function SignupPage() {
       setError(
         "Department ID is required for this role.",
       );
-
       return;
     }
 
@@ -172,26 +153,18 @@ export default function SignupPage() {
       setError(
         "Employee ID is required for an employee account.",
       );
-
       return;
     }
 
     const request: RegisterRequest = {
-      fullName:
-        normalizedFullName,
-
-      email:
-        normalizedEmail,
-
+      fullName: normalizedFullName,
+      email: normalizedEmail,
       password,
-
       role,
-
       departmentId:
         role === "SuperAdmin"
           ? null
           : normalizedDepartmentId,
-
       employeeId:
         role === "Employee"
           ? normalizedEmployeeId
@@ -209,9 +182,7 @@ export default function SignupPage() {
             "Content-Type":
               "application/json",
           },
-          body: JSON.stringify(
-            request,
-          ),
+          body: JSON.stringify(request),
         },
       );
 
@@ -235,17 +206,12 @@ export default function SignupPage() {
       );
 
       window.setTimeout(() => {
-        navigate(
-          "/login",
-          {
-            replace: true,
-          },
-        );
+        navigate("/login", {
+          replace: true,
+        });
       }, 1200);
     } catch (caughtError: unknown) {
-      if (
-        caughtError instanceof TypeError
-      ) {
+      if (caughtError instanceof TypeError) {
         setError(
           `Could not connect to the API at ${API_BASE_URL}. ` +
             "Make sure the backend is running and VITE_API_BASE_URL is correct.",
@@ -254,13 +220,8 @@ export default function SignupPage() {
         return;
       }
 
-      if (
-        caughtError instanceof Error
-      ) {
-        setError(
-          caughtError.message,
-        );
-
+      if (caughtError instanceof Error) {
+        setError(caughtError.message);
         return;
       }
 
@@ -278,8 +239,7 @@ export default function SignupPage() {
     setRole(selectedRole);
 
     if (
-      selectedRole ===
-      "SuperAdmin"
+      selectedRole === "SuperAdmin"
     ) {
       setDepartmentId("");
       setEmployeeId("");
@@ -318,20 +278,6 @@ export default function SignupPage() {
             borderRadius: 3,
           }}
         >
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mb: 2,
-            }}
-          >
-            <PersonAddOutlinedIcon
-              sx={{
-                fontSize: 48,
-              }}
-            />
-          </Box>
-
           <Typography
             variant="h4"
             align="center"
@@ -407,9 +353,7 @@ export default function SignupPage() {
               type="email"
               value={email}
               onChange={(event) => {
-                setEmail(
-                  event.target.value,
-                );
+                setEmail(event.target.value);
               }}
               autoComplete="email"
               required
@@ -469,9 +413,7 @@ export default function SignupPage() {
                 mb: 2,
               }}
             >
-              <InputLabel
-                id="role-label"
-              >
+              <InputLabel id="role-label">
                 Role
               </InputLabel>
 
@@ -488,28 +430,21 @@ export default function SignupPage() {
                   );
                 }}
               >
-                <MenuItem
-                  value="SuperAdmin"
-                >
+                <MenuItem value="SuperAdmin">
                   Super Admin
                 </MenuItem>
 
-                <MenuItem
-                  value="DepartmentAdmin"
-                >
+                <MenuItem value="DepartmentAdmin">
                   Department Admin
                 </MenuItem>
 
-                <MenuItem
-                  value="Employee"
-                >
+                <MenuItem value="Employee">
                   Employee
                 </MenuItem>
               </Select>
             </FormControl>
 
-            {role !==
-              "SuperAdmin" && (
+            {role !== "SuperAdmin" && (
               <TextField
                 id="departmentId"
                 name="departmentId"
@@ -531,8 +466,7 @@ export default function SignupPage() {
               />
             )}
 
-            {role ===
-              "Employee" && (
+            {role === "Employee" && (
               <TextField
                 id="employeeId"
                 name="employeeId"
@@ -603,9 +537,7 @@ async function readResponseBody(
   response: Response,
 ): Promise<unknown> {
   const contentType =
-    response.headers.get(
-      "content-type",
-    );
+    response.headers.get("content-type");
 
   if (
     contentType?.includes(
@@ -615,8 +547,7 @@ async function readResponseBody(
     return response.json();
   }
 
-  const text =
-    await response.text();
+  const text = await response.text();
 
   if (!text) {
     return {};
@@ -632,8 +563,7 @@ function getErrorMessage(
   fallbackMessage: string,
 ): string {
   if (
-    typeof responseBody !==
-      "object" ||
+    typeof responseBody !== "object" ||
     responseBody === null
   ) {
     return fallbackMessage;
@@ -643,22 +573,17 @@ function getErrorMessage(
     responseBody as ApiErrorResponse;
 
   if (
-    typeof apiError.message ===
-      "string" &&
+    typeof apiError.message === "string" &&
     apiError.message.trim()
   ) {
     return apiError.message;
   }
 
   if (
-    Array.isArray(
-      apiError.errors,
-    ) &&
+    Array.isArray(apiError.errors) &&
     apiError.errors.length > 0
   ) {
-    return apiError.errors.join(
-      " ",
-    );
+    return apiError.errors.join(" ");
   }
 
   return fallbackMessage;

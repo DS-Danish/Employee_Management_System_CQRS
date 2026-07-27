@@ -1,80 +1,99 @@
-import {
-  Navigate,
-  useNavigate,
-} from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 
-import type {
-  LoginResponse,
-} from "../Types/auth";
+interface StoredUser {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: string;
+  departmentId: string | null;
+  employeeId: string | null;
+  expiresAtUtc: string;
+}
+
+const TOKEN_KEY = "authToken";
+const USER_KEY = "authUser";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
 
-  const token =
-    localStorage.getItem("accessToken");
-
-  const storedUser =
-    localStorage.getItem("currentUser");
+  const token = localStorage.getItem(TOKEN_KEY);
+  const storedUser = localStorage.getItem(USER_KEY);
 
   if (!token || !storedUser) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-      />
-    );
+    return <Navigate to="/login" replace />;
   }
 
-  let currentUser: LoginResponse;
+  let currentUser: StoredUser;
 
   try {
-    currentUser =
-      JSON.parse(storedUser) as LoginResponse;
+    currentUser = JSON.parse(storedUser) as StoredUser;
   } catch {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("currentUser");
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
 
-    return (
-      <Navigate
-        to="/login"
-        replace
-      />
-    );
+    return <Navigate to="/login" replace />;
   }
 
   function handleLogout() {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("currentUser");
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
 
-    navigate("/login");
+    navigate("/login", { replace: true });
   }
 
   return (
-    <main className="dashboard-page">
-      <section className="dashboard-card">
-        <div>
-          <p className="auth-eyebrow">
-            Employee Management System
-          </p>
+    <main
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        background: "#f5f5f5",
+      }}
+    >
+      <div
+        style={{
+          width: 500,
+          background: "#fff",
+          padding: 40,
+          borderRadius: 10,
+          boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+        }}
+      >
+        <p
+          style={{
+            color: "#666",
+            marginBottom: 10,
+          }}
+        >
+          Employee Management System
+        </p>
 
-          <h1>
-            Welcome, {currentUser.fullName}
-          </h1>
+        <h1>Welcome, {currentUser.fullName}</h1>
 
-          <p>
-            You are signed in as{" "}
-            <strong>{currentUser.role}</strong>.
-          </p>
-        </div>
+        <p>
+          <strong>Email:</strong> {currentUser.email}
+        </p>
+
+        <p>
+          <strong>Role:</strong> {currentUser.role}
+        </p>
+
+        <p>
+          <strong>User ID:</strong> {currentUser.userId}
+        </p>
 
         <button
-          type="button"
-          className="secondary-button"
           onClick={handleLogout}
+          style={{
+            marginTop: 20,
+            padding: "10px 20px",
+            cursor: "pointer",
+          }}
         >
-          Sign out
+          Sign Out
         </button>
-      </section>
+      </div>
     </main>
   );
 }

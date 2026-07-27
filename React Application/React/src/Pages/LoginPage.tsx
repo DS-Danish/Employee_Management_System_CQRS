@@ -1,9 +1,6 @@
 import { useState } from "react";
 import type { SyntheticEvent } from "react";
-import {
-  Link,
-  useNavigate,
-} from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -14,7 +11,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { LockOutlined as LockOutlinedIcon } from "@mui/icons-material";
 
 interface LoginResponse {
   token: string;
@@ -49,15 +45,9 @@ const API_BASE_URL =
 export default function LoginPage() {
   const navigate = useNavigate();
 
-  const [email, setEmail] =
-    useState("");
-
-  const [password, setPassword] =
-    useState("");
-
-  const [error, setError] =
-    useState("");
-
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] =
     useState(false);
 
@@ -89,8 +79,7 @@ export default function LoginPage() {
         {
           method: "POST",
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             email: normalizedEmail,
@@ -121,24 +110,14 @@ export default function LoginPage() {
       }
 
       const storedUser: StoredUser = {
-        userId:
-          loginResponse.userId,
-
-        fullName:
-          loginResponse.fullName,
-
-        email:
-          loginResponse.email,
-
-        role:
-          loginResponse.role,
-
+        userId: loginResponse.userId,
+        fullName: loginResponse.fullName,
+        email: loginResponse.email,
+        role: loginResponse.role,
         departmentId:
           loginResponse.departmentId,
-
         employeeId:
           loginResponse.employeeId,
-
         expiresAtUtc:
           loginResponse.expiresAtUtc,
       };
@@ -153,16 +132,11 @@ export default function LoginPage() {
         JSON.stringify(storedUser),
       );
 
-      navigate(
-        "/dashboard",
-        {
-          replace: true,
-        },
-      );
+      navigate("/dashboard", {
+        replace: true,
+      });
     } catch (caughtError: unknown) {
-      if (
-        caughtError instanceof TypeError
-      ) {
+      if (caughtError instanceof TypeError) {
         setError(
           `Could not connect to the API at ${API_BASE_URL}. ` +
             "Make sure the backend is running and VITE_API_BASE_URL is correct.",
@@ -171,13 +145,8 @@ export default function LoginPage() {
         return;
       }
 
-      if (
-        caughtError instanceof Error
-      ) {
-        setError(
-          caughtError.message,
-        );
-
+      if (caughtError instanceof Error) {
+        setError(caughtError.message);
         return;
       }
 
@@ -213,20 +182,6 @@ export default function LoginPage() {
             borderRadius: 3,
           }}
         >
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              mb: 2,
-            }}
-          >
-            <LockOutlinedIcon
-              sx={{
-                fontSize: 48,
-              }}
-            />
-          </Box>
-
           <Typography
             variant="h4"
             align="center"
@@ -271,9 +226,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(event) => {
-                setEmail(
-                  event.target.value,
-                );
+                setEmail(event.target.value);
               }}
               autoComplete="email"
               autoFocus
@@ -292,9 +245,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(event) => {
-                setPassword(
-                  event.target.value,
-                );
+                setPassword(event.target.value);
               }}
               autoComplete="current-password"
               required
@@ -354,9 +305,7 @@ async function readResponseBody(
   response: Response,
 ): Promise<unknown> {
   const contentType =
-    response.headers.get(
-      "content-type",
-    );
+    response.headers.get("content-type");
 
   if (
     contentType?.includes(
@@ -366,8 +315,7 @@ async function readResponseBody(
     return response.json();
   }
 
-  const text =
-    await response.text();
+  const text = await response.text();
 
   if (!text) {
     return {};
@@ -383,8 +331,7 @@ function getErrorMessage(
   fallbackMessage: string,
 ): string {
   if (
-    typeof responseBody !==
-      "object" ||
+    typeof responseBody !== "object" ||
     responseBody === null
   ) {
     return fallbackMessage;
@@ -394,22 +341,17 @@ function getErrorMessage(
     responseBody as ApiErrorResponse;
 
   if (
-    typeof apiError.message ===
-      "string" &&
+    typeof apiError.message === "string" &&
     apiError.message.trim()
   ) {
     return apiError.message;
   }
 
   if (
-    Array.isArray(
-      apiError.errors,
-    ) &&
+    Array.isArray(apiError.errors) &&
     apiError.errors.length > 0
   ) {
-    return apiError.errors.join(
-      " ",
-    );
+    return apiError.errors.join(" ");
   }
 
   return fallbackMessage;
