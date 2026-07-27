@@ -42,13 +42,13 @@ public sealed class Employee
         string lastName,
         string email,
         Address address,
-        Guid? DepartmentId)
+        Guid? departmentId)
     {
         FirstName = firstName;
         LastName = lastName;
         Email = email;
         Address = address;
-        DepartmentId = DepartmentId;
+        DepartmentId = departmentId;
     }
 
     public void AssignDepartment(Guid? departmentId)

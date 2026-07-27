@@ -5,8 +5,8 @@ D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.G
 D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.AssemblyInfoInputs.cache
 D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.AssemblyInfo.cs
 D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.csproj.CoreCompileInputs.cache
+D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.sourcelink.json
 D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.dll
 D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\refint\EmployeeManagement.Domain.dll
 D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.pdb
 D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\ref\EmployeeManagement.Domain.dll
-D:\Melior\EmployeeManagement.Domain\obj\Debug\net8.0\EmployeeManagement.Domain.sourcelink.json

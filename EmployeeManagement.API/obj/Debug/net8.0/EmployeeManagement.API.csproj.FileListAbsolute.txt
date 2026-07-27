@@ -13,6 +13,7 @@ D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\FluentValidation.DependencyInj
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\Humanizer.dll
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\MediatR.dll
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\MediatR.Contracts.dll
+D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\Microsoft.AspNetCore.OpenApi.dll
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\Microsoft.Bcl.AsyncInterfaces.dll
 D:\Melior\EmployeeManagement.API\bin\Debug\net8.0\Microsoft.CodeAnalysis.dll
@@ -168,6 +169,7 @@ D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.Assembl
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.csproj.CoreCompileInputs.cache
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.MvcApplicationPartsAssemblyInfo.cs
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.MvcApplicationPartsAssemblyInfo.cache
+D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.sourcelink.json
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\staticwebassets.build.json
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\staticwebassets.development.json
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\staticwebassets\msbuild.EmployeeManagement.API.Microsoft.AspNetCore.StaticWebAssets.props
@@ -182,4 +184,3 @@ D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\refint\EmployeeManagement.API.
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.pdb
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.genruntimeconfig.cache
 D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\ref\EmployeeManagement.API.dll
-D:\Melior\EmployeeManagement.API\obj\Debug\net8.0\EmployeeManagement.API.sourcelink.json

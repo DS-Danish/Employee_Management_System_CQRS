@@ -1,5 +1,7 @@
 using EmployeeManagement.Application.Abstractions;
+using EmployeeManagement.Infrastructure.Identity;
 using EmployeeManagement.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,7 +17,7 @@ public static class DependencyInjection
         string connectionString =
             configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException(
-                "DefaultConnection is not configured.");
+                "Connection string 'DefaultConnection' was not found.");
 
         services.AddDbContext<ApplicationDbContext>(
             options =>
@@ -26,6 +28,21 @@ public static class DependencyInjection
         services.AddScoped<IApplicationDbContext>(
             serviceProvider =>
                 serviceProvider.GetRequiredService<ApplicationDbContext>());
+
+        services
+            .AddIdentityCore<ApplicationUser>(
+                options =>
+                {
+                    options.Password.RequiredLength = 5;
+                    options.Password.RequireDigit = false;
+                    options.Password.RequireLowercase = false;
+                    options.Password.RequireUppercase = false;
+                    options.Password.RequireNonAlphanumeric = false;
+
+                    options.User.RequireUniqueEmail = true;
+                })
+            .AddRoles<IdentityRole>()
+            .AddEntityFrameworkStores<ApplicationDbContext>();
 
         return services;
     }

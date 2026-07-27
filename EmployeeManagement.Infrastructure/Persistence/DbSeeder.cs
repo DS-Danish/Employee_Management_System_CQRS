@@ -1,281 +1,323 @@
-using Bogus;
+using EmployeeManagement.Application.Common.Constants;
 using EmployeeManagement.Domain.Entities;
+using EmployeeManagement.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace EmployeeManagement.Infrastructure.Persistence;
+namespace EmployeeManagement.Infrastructure.Identity;
 
 public static class DbSeeder
 {
+    private const string DevelopmentPassword =
+        "12345";
+
     public static async Task SeedAsync(
-        ApplicationDbContext context,
-        CancellationToken cancellationToken = default)
+        IServiceProvider serviceProvider)
     {
-        await SeedDepartmentsAsync(context, cancellationToken);
-        await SeedProjectsAsync(context, cancellationToken);
-        await SeedEmployeesAsync(context, cancellationToken);
-        await SeedEmployeeDetailsAsync(context, cancellationToken);
-        await SeedEmployeeProjectsAsync(context, cancellationToken);
+        ArgumentNullException.ThrowIfNull(
+            serviceProvider);
 
-        await context.SaveChangesAsync(cancellationToken);
+        using IServiceScope scope =
+            serviceProvider.CreateScope();
+
+        IServiceProvider services =
+            scope.ServiceProvider;
+
+        RoleManager<IdentityRole> roleManager =
+            services.GetRequiredService<
+                RoleManager<IdentityRole>>();
+
+        UserManager<ApplicationUser> userManager =
+            services.GetRequiredService<
+                UserManager<ApplicationUser>>();
+
+        ApplicationDbContext databaseContext =
+            services.GetRequiredService<
+                ApplicationDbContext>();
+
+        await SeedRolesAsync(roleManager);
+
+        await SeedEmployeeUsersAsync(
+            databaseContext,
+            userManager);
     }
 
-    private static async Task SeedDepartmentsAsync(
-        ApplicationDbContext context,
-        CancellationToken cancellationToken)
+    private static async Task SeedRolesAsync(
+        RoleManager<IdentityRole> roleManager)
     {
-        int existingCount = await context.Departments
-            .CountAsync(cancellationToken);
-
-        int recordsToCreate = 20 - existingCount;
-
-        if (recordsToCreate <= 0)
+        foreach (string roleName in AppRoles.All)
         {
-            return;
-        }
+            bool roleExists =
+                await roleManager.RoleExistsAsync(
+                    roleName);
 
-        var faker = new Faker<Department>()
-            .CustomInstantiator(f =>
-            {
-                string uniqueName =
-                    $"{f.Commerce.Department()}-{Guid.NewGuid():N}";
-
-                return new Department(uniqueName[..Math.Min(100, uniqueName.Length)]);
-            });
-
-        List<Department> departments = faker.Generate(recordsToCreate);
-
-        await context.Departments.AddRangeAsync(
-            departments,
-            cancellationToken);
-
-        await context.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task SeedProjectsAsync(
-        ApplicationDbContext context,
-        CancellationToken cancellationToken)
-    {
-        int existingCount = await context.Projects
-            .CountAsync(cancellationToken);
-
-        int recordsToCreate = 20 - existingCount;
-
-        if (recordsToCreate <= 0)
-        {
-            return;
-        }
-
-        var faker = new Faker<Project>()
-            .CustomInstantiator(f =>
-            {
-                DateTime startDate = f.Date.Past(2);
-
-                DateTime? endDate = f.Random.Bool()
-                    ? f.Date.Future(1, startDate)
-                    : null;
-
-                string uniqueName =
-                    $"{f.Commerce.ProductName()}-{Guid.NewGuid():N}";
-
-                string projectName =
-                    uniqueName[..Math.Min(150, uniqueName.Length)];
-
-                return new Project(
-                    projectName,
-                    f.Lorem.Sentence(),
-                    startDate,
-                    endDate);
-            });
-
-        List<Project> projects = faker.Generate(recordsToCreate);
-
-        await context.Projects.AddRangeAsync(
-            projects,
-            cancellationToken);
-
-        await context.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task SeedEmployeesAsync(
-        ApplicationDbContext context,
-        CancellationToken cancellationToken)
-    {
-        List<Guid> departmentIds = await context.Departments
-            .Select(department => department.Id)
-            .ToListAsync(cancellationToken);
-
-        if (departmentIds.Count == 0)
-        {
-            return;
-        }
-
-        List<Employee> employeesWithoutDepartment =
-            await context.Employees
-                .Where(employee =>
-                    employee.DepartmentId == null)
-                .ToListAsync(cancellationToken);
-
-        var assignmentFaker = new Faker();
-
-        foreach (Employee employee in employeesWithoutDepartment)
-        {
-            Guid departmentId =
-                assignmentFaker.PickRandom(departmentIds);
-
-            employee.AssignDepartment(departmentId);
-        }
-
-        int existingCount = await context.Employees
-            .CountAsync(cancellationToken);
-
-        int recordsToCreate = 20 - existingCount;
-
-        if (recordsToCreate > 0)
-        {
-            var faker = new Faker<Employee>()
-                .CustomInstantiator(f =>
-                {
-                    Guid departmentId =
-                        f.PickRandom(departmentIds);
-
-                    return new Employee(
-                        f.Name.FirstName(),
-                        f.Name.LastName(),
-                        f.Internet.Email()
-                            .Trim()
-                            .ToLowerInvariant(),
-                        new Address(
-                            f.Address.StreetAddress(),
-                            f.Address.City(),
-                            "Pakistan",
-                            f.Address.ZipCode()),
-                        departmentId);
-                });
-
-            List<Employee> employees =
-                faker.Generate(recordsToCreate);
-
-            await context.Employees.AddRangeAsync(
-                employees,
-                cancellationToken);
-        }
-
-        await context.SaveChangesAsync(
-            cancellationToken);
-    }
-
-    private static async Task SeedEmployeeDetailsAsync(
-        ApplicationDbContext context,
-        CancellationToken cancellationToken)
-    {
-        List<Guid> employeeIdsWithoutDetails =
-            await context.Employees
-                .Where(employee =>
-                    !context.EmployeeDetails.Any(detail =>
-                        detail.EmployeeId == employee.Id))
-                .Select(employee => employee.Id)
-                .Take(20)
-                .ToListAsync(cancellationToken);
-
-        if (employeeIdsWithoutDetails.Count == 0)
-        {
-            return;
-        }
-
-        var faker = new Faker();
-
-        List<EmployeeDetail> details = employeeIdsWithoutDetails
-            .Select(employeeId =>
-                new EmployeeDetail(
-                    employeeId,
-                    faker.Random.Replace("#####-#######-#"),
-                    faker.Phone.PhoneNumber(),
-                    faker.Date.Past(
-                        30,
-                        DateTime.Today.AddYears(-18)),
-                    faker.PickRandom("Male", "Female")))
-            .ToList();
-
-        await context.EmployeeDetails.AddRangeAsync(
-            details,
-            cancellationToken);
-
-        await context.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task SeedEmployeeProjectsAsync(
-        ApplicationDbContext context,
-        CancellationToken cancellationToken)
-    {
-        int existingCount = await context.EmployeeProjects
-            .CountAsync(cancellationToken);
-
-        int recordsToCreate = 20 - existingCount;
-
-        if (recordsToCreate <= 0)
-        {
-            return;
-        }
-
-        List<Guid> employeeIds = await context.Employees
-            .Select(employee => employee.Id)
-            .ToListAsync(cancellationToken);
-
-        List<Guid> projectIds = await context.Projects
-            .Select(project => project.Id)
-            .ToListAsync(cancellationToken);
-
-        if (employeeIds.Count == 0 || projectIds.Count == 0)
-        {
-            return;
-        }
-
-        var existingAssignments = await context.EmployeeProjects
-            .Select(employeeProject => new
-            {
-                employeeProject.EmployeeId,
-                employeeProject.ProjectId
-            })
-            .ToListAsync(cancellationToken);
-
-        HashSet<string> usedAssignments = existingAssignments
-            .Select(assignment =>
-                $"{assignment.EmployeeId}:{assignment.ProjectId}")
-            .ToHashSet();
-
-        var faker = new Faker();
-        var employeeProjects = new List<EmployeeProject>();
-
-        int maximumPossibleAssignments =
-            employeeIds.Count * projectIds.Count;
-
-        int maximumAssignmentsToCreate = Math.Min(
-            recordsToCreate,
-            maximumPossibleAssignments - usedAssignments.Count);
-
-        while (employeeProjects.Count < maximumAssignmentsToCreate)
-        {
-            Guid employeeId = faker.PickRandom(employeeIds);
-            Guid projectId = faker.PickRandom(projectIds);
-
-            string assignmentKey = $"{employeeId}:{projectId}";
-
-            if (!usedAssignments.Add(assignmentKey))
+            if (roleExists)
             {
                 continue;
             }
 
-            employeeProjects.Add(
-                new EmployeeProject(employeeId, projectId));
+            IdentityResult result =
+                await roleManager.CreateAsync(
+                    new IdentityRole(roleName));
+
+            EnsureSucceeded(
+                result,
+                $"creating role '{roleName}'");
+        }
+    }
+
+    private static async Task SeedEmployeeUsersAsync(
+        ApplicationDbContext databaseContext,
+        UserManager<ApplicationUser> userManager)
+    {
+        List<Employee> employees =
+            await databaseContext.Employees
+                .AsNoTracking()
+                .OrderBy(
+                    employee =>
+                        employee.CreatedAtUtc)
+                .Take(20)
+                .ToListAsync();
+
+        foreach (Employee employee in employees)
+        {
+            ApplicationUser? linkedUser =
+                await userManager.Users
+                    .FirstOrDefaultAsync(
+                        user =>
+                            user.EmployeeId ==
+                            employee.Id);
+
+            if (linkedUser is not null)
+            {
+                await UpdateLinkedUserAsync(
+                    userManager,
+                    linkedUser,
+                    employee);
+
+                await EnsureEmployeeRoleAsync(
+                    userManager,
+                    linkedUser);
+
+                continue;
+            }
+
+            string email =
+                GetEmployeeEmail(employee);
+
+            ApplicationUser? emailUser =
+                await userManager.FindByEmailAsync(
+                    email);
+
+            if (emailUser is not null)
+            {
+                emailUser.FullName =
+                    GetEmployeeFullName(employee);
+
+                emailUser.EmployeeId =
+                    employee.Id;
+
+                emailUser.DepartmentId =
+                    employee.DepartmentId;
+
+                emailUser.EmailConfirmed =
+                    true;
+
+                IdentityResult updateResult =
+                    await userManager.UpdateAsync(
+                        emailUser);
+
+                EnsureSucceeded(
+                    updateResult,
+                    $"linking employee '{employee.Id}'");
+
+                await EnsureEmployeeRoleAsync(
+                    userManager,
+                    emailUser);
+
+                continue;
+            }
+
+            var user = new ApplicationUser
+            {
+                FullName =
+                    GetEmployeeFullName(employee),
+
+                UserName =
+                    email,
+
+                Email =
+                    email,
+
+                EmailConfirmed =
+                    true,
+
+                EmployeeId =
+                    employee.Id,
+
+                DepartmentId =
+                    employee.DepartmentId
+            };
+
+            IdentityResult createResult =
+                await userManager.CreateAsync(
+                    user,
+                    DevelopmentPassword);
+
+            EnsureSucceeded(
+                createResult,
+                $"creating user for employee '{employee.Id}'");
+
+            IdentityResult roleResult =
+                await userManager.AddToRoleAsync(
+                    user,
+                    AppRoles.Employee);
+
+            EnsureSucceeded(
+                roleResult,
+                $"assigning Employee role to employee '{employee.Id}'");
+        }
+    }
+
+    private static async Task UpdateLinkedUserAsync(
+        UserManager<ApplicationUser> userManager,
+        ApplicationUser user,
+        Employee employee)
+    {
+        string email =
+            GetEmployeeEmail(employee);
+
+        string fullName =
+            GetEmployeeFullName(employee);
+
+        bool hasChanges =
+            false;
+
+        if (user.FullName != fullName)
+        {
+            user.FullName =
+                fullName;
+
+            hasChanges =
+                true;
         }
 
-        if (employeeProjects.Count == 0)
+        if (user.Email != email)
+        {
+            user.Email =
+                email;
+
+            user.UserName =
+                email;
+
+            hasChanges =
+                true;
+        }
+
+        if (user.DepartmentId !=
+            employee.DepartmentId)
+        {
+            user.DepartmentId =
+                employee.DepartmentId;
+
+            hasChanges =
+                true;
+        }
+
+        if (!user.EmailConfirmed)
+        {
+            user.EmailConfirmed =
+                true;
+
+            hasChanges =
+                true;
+        }
+
+        if (!hasChanges)
         {
             return;
         }
 
-        await context.EmployeeProjects.AddRangeAsync(
-            employeeProjects,
-            cancellationToken);
+        IdentityResult result =
+            await userManager.UpdateAsync(user);
+
+        EnsureSucceeded(
+            result,
+            $"updating user for employee '{employee.Id}'");
+    }
+
+    private static async Task EnsureEmployeeRoleAsync(
+        UserManager<ApplicationUser> userManager,
+        ApplicationUser user)
+    {
+        bool hasEmployeeRole =
+            await userManager.IsInRoleAsync(
+                user,
+                AppRoles.Employee);
+
+        if (hasEmployeeRole)
+        {
+            return;
+        }
+
+        IdentityResult result =
+            await userManager.AddToRoleAsync(
+                user,
+                AppRoles.Employee);
+
+        EnsureSucceeded(
+            result,
+            $"assigning Employee role to user '{user.Email}'");
+    }
+
+    private static string GetEmployeeEmail(
+        Employee employee)
+    {
+        if (string.IsNullOrWhiteSpace(
+            employee.Email))
+        {
+            throw new InvalidOperationException(
+                $"Employee '{employee.Id}' does not have an email address.");
+        }
+
+        return employee.Email
+            .Trim()
+            .ToLowerInvariant();
+    }
+
+    private static string GetEmployeeFullName(
+        Employee employee)
+    {
+        string fullName =
+            $"{employee.FirstName} {employee.LastName}"
+                .Trim();
+
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            return $"Employee {employee.Id}";
+        }
+
+        return fullName;
+    }
+
+    private static void EnsureSucceeded(
+        IdentityResult result,
+        string operation)
+    {
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        string errors =
+            string.Join(
+                ", ",
+                result.Errors.Select(
+                    error =>
+                        $"{error.Code}: {error.Description}"));
+
+        throw new InvalidOperationException(
+            $"Identity error while {operation}. {errors}");
     }
 }

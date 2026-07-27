@@ -8,9 +8,9 @@ D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.App
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.AssemblyInfoInputs.cache
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.AssemblyInfo.cs
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.csproj.CoreCompileInputs.cache
+D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.sourcelink.json
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\Employee.16DA35CB.Up2Date
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.dll
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\refint\EmployeeManagement.Application.dll
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.pdb
 D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\ref\EmployeeManagement.Application.dll
-D:\Melior\EmployeeManagement.Application\obj\Debug\net8.0\EmployeeManagement.Application.sourcelink.json
