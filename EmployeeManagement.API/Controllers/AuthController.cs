@@ -161,6 +161,47 @@ public sealed class AuthController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("available-employees")]
+    [Authorize(Roles = AppRoles.SuperAdmin)]
+    public async Task<ActionResult<
+        IReadOnlyList<AvailableEmployeeResponse>>>
+        GetAvailableEmployees(
+            CancellationToken cancellationToken)
+    {
+        List<Guid> linkedEmployeeIds =
+            await _userManager.Users
+                .Where(user =>
+                    user.EmployeeId.HasValue)
+                .Select(user =>
+                    user.EmployeeId!.Value)
+                .ToListAsync(
+                    cancellationToken);
+
+        IReadOnlyList<AvailableEmployeeResponse>
+            employees =
+            await _databaseContext.Employees
+                .AsNoTracking()
+                .Where(employee =>
+                    !linkedEmployeeIds.Contains(
+                        employee.Id))
+                .OrderBy(employee =>
+                    employee.FirstName)
+                .ThenBy(employee =>
+                    employee.LastName)
+                .Select(employee =>
+                    new AvailableEmployeeResponse(
+                        employee.Id,
+                        employee.FirstName +
+                        " " +
+                        employee.LastName,
+                        employee.Email,
+                        employee.DepartmentId))
+                .ToListAsync(
+                    cancellationToken);
+
+        return Ok(employees);
+    }
+
     [HttpPost("register")]
     [Authorize(Roles = AppRoles.SuperAdmin)]
     [ProducesResponseType(
@@ -590,6 +631,12 @@ public sealed class AuthController : ControllerBase
 
         return null;
     }
+
+    public sealed record AvailableEmployeeResponse(
+    Guid Id,
+    string FullName,
+    string Email,
+    Guid? DepartmentId);
 
     private static string NormalizeRole(
         string role)

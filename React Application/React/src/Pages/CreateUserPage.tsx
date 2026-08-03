@@ -1,10 +1,14 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
 } from "react";
 
-import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import ManageAccountsIcon from
+  "@mui/icons-material/ManageAccounts";
+import RefreshIcon from
+  "@mui/icons-material/Refresh";
 
 import {
   Alert,
@@ -14,6 +18,7 @@ import {
   CircularProgress,
   Container,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Paper,
@@ -21,10 +26,12 @@ import {
   Snackbar,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 
 import {
+  getAvailableEmployees,
   registerUser,
 } from "../services/authService";
 
@@ -32,21 +39,15 @@ import {
   getDepartments,
 } from "../services/departmentService";
 
-import {
-  getEmployees,
-} from "../services/employeeService";
+import type {
+  AvailableEmployee,
+  RegisterRequest,
+  UserRole,
+} from "../Types/auth";
 
 import type {
   Department,
 } from "../Types/department";
-
-import type {
-  Employee,
-} from "../Types/employee";
-
-import type {
-  UserRole,
-} from "../Types/auth";
 
 export default function CreateUserPage():
   React.ReactElement {
@@ -88,9 +89,11 @@ export default function CreateUserPage():
   ] = useState<Department[]>([]);
 
   const [
-    employees,
-    setEmployees,
-  ] = useState<Employee[]>([]);
+    availableEmployees,
+    setAvailableEmployees,
+  ] = useState<
+    AvailableEmployee[]
+  >([]);
 
   const [
     loading,
@@ -112,62 +115,92 @@ export default function CreateUserPage():
     setSuccessMessage,
   ] = useState<string>("");
 
+  const requiresEmployee: boolean =
+    role === "Employee" ||
+    role === "TeamLead";
+
+  const loadFormData =
+    useCallback(
+      async (): Promise<void> => {
+        setLoading(true);
+        setError("");
+
+        try {
+          const [
+            departmentResult,
+            employeeResult,
+          ] = await Promise.all([
+            getDepartments(),
+            getAvailableEmployees(),
+          ]);
+
+          setDepartments(
+            departmentResult,
+          );
+
+          setAvailableEmployees(
+            employeeResult,
+          );
+        } catch (
+          caughtError: unknown
+        ) {
+          const message: string =
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Unable to load user form data.";
+
+          setError(message);
+        } finally {
+          setLoading(false);
+        }
+      },
+      [],
+    );
+
   useEffect(() => {
-    async function loadData():
-      Promise<void> {
-      try {
-        const [
-          departmentResult,
-          employeeResult,
-        ] = await Promise.all([
-          getDepartments(),
-          getEmployees(),
-        ]);
+    void loadFormData();
+  }, [loadFormData]);
 
-        setDepartments(
-          departmentResult,
-        );
+  const employeesForSelectedDepartment:
+    AvailableEmployee[] =
+    useMemo(
+      (): AvailableEmployee[] => {
+        if (!departmentId) {
+          return [];
+        }
 
-        setEmployees(
-          employeeResult,
-        );
-      } catch (
-        caughtError: unknown
-      ) {
-        setError(
-          caughtError instanceof Error
-            ? caughtError.message
-            : "Unable to load form data.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void loadData();
-  }, []);
-
-  const availableEmployees:
-    Employee[] = useMemo(
-    () =>
-      employees.filter(
-        (
-          employee: Employee,
-        ): boolean =>
-          !departmentId ||
-          employee.departmentId ===
+        return availableEmployees.filter(
+          (
+            employee:
+              AvailableEmployee,
+          ): boolean =>
+            employee.departmentId ===
             departmentId,
-      ),
-    [
-      employees,
-      departmentId,
-    ],
-  );
+        );
+      },
+      [
+        availableEmployees,
+        departmentId,
+      ],
+    );
+
+  function clearEmployeeSelection():
+    void {
+    setEmployeeId("");
+    setFullName("");
+    setEmail("");
+  }
 
   function handleRoleChange(
     selectedRole: UserRole,
   ): void {
     setRole(selectedRole);
+    setError("");
+
+    setDepartmentId("");
+    setEmployeeId("");
+    setFullName("");
+    setEmail("");
 
     if (
       selectedRole ===
@@ -178,6 +211,104 @@ export default function CreateUserPage():
     }
   }
 
+  function handleDepartmentChange(
+    selectedDepartmentId: string,
+  ): void {
+    setDepartmentId(
+      selectedDepartmentId,
+    );
+
+    clearEmployeeSelection();
+  }
+
+  function handleEmployeeChange(
+    selectedEmployeeId: string,
+  ): void {
+    setEmployeeId(
+      selectedEmployeeId,
+    );
+
+    const selectedEmployee:
+      AvailableEmployee | undefined =
+      availableEmployees.find(
+        (
+          employee:
+            AvailableEmployee,
+        ): boolean =>
+          employee.id ===
+          selectedEmployeeId,
+      );
+
+    if (!selectedEmployee) {
+      setFullName("");
+      setEmail("");
+
+      return;
+    }
+
+    setFullName(
+      selectedEmployee.fullName,
+    );
+
+    setEmail(
+      selectedEmployee.email,
+    );
+
+    if (
+      selectedEmployee.departmentId
+    ) {
+      setDepartmentId(
+        selectedEmployee.departmentId,
+      );
+    }
+  }
+
+  function validateForm():
+    string | null {
+    if (!fullName.trim()) {
+      return "Full name is required.";
+    }
+
+    if (!email.trim()) {
+      return "Email is required.";
+    }
+
+    if (!password) {
+      return "Password is required.";
+    }
+
+    if (
+      password.length < 6
+    ) {
+      return (
+        "Password must contain at " +
+        "least 6 characters."
+      );
+    }
+
+    if (
+      requiresEmployee &&
+      !departmentId
+    ) {
+      return (
+        "Department is required " +
+        "for Employee and Team Lead accounts."
+      );
+    }
+
+    if (
+      requiresEmployee &&
+      !employeeId
+    ) {
+      return (
+        "Select an employee who " +
+        "does not already have a user account."
+      );
+    }
+
+    return null;
+  }
+
   async function handleSubmit(
     event:
       React.FormEvent<HTMLFormElement>,
@@ -186,81 +317,75 @@ export default function CreateUserPage():
 
     setError("");
 
-    if (
-      !fullName.trim() ||
-      !email.trim() ||
-      !password.trim()
-    ) {
-      setError(
-        "Full name, email and password are required.",
-      );
+    const validationError:
+      string | null =
+      validateForm();
+
+    if (validationError) {
+      setError(validationError);
 
       return;
     }
 
-    if (
-      role !== "SuperAdmin" &&
-      !departmentId
-    ) {
-      setError(
-        "Department is required.",
-      );
+    const request:
+      RegisterRequest = {
+      fullName:
+        fullName.trim(),
 
-      return;
-    }
+      email:
+        email
+          .trim()
+          .toLowerCase(),
 
-    if (
-      (role === "Employee" ||
-        role === "TeamLead") &&
-      !employeeId
-    ) {
-      setError(
-        "Employee is required.",
-      );
+      password,
 
-      return;
-    }
+      role,
+
+      departmentId:
+        requiresEmployee
+          ? departmentId
+          : null,
+
+      employeeId:
+        requiresEmployee
+          ? employeeId
+          : null,
+    };
 
     setSaving(true);
 
     try {
-      await registerUser({
-        fullName:
-          fullName.trim(),
-        email:
-          email
-            .trim()
-            .toLowerCase(),
-        password,
-        role,
-        departmentId:
-          role === "SuperAdmin"
-            ? null
-            : departmentId,
-        employeeId:
-          role === "SuperAdmin"
-            ? null
-            : employeeId,
-      });
-
-      setSuccessMessage(
-        "User account created successfully.",
+      await registerUser(
+        request,
       );
 
-      setFullName("");
-      setEmail("");
+      setSuccessMessage(
+        `${fullName.trim()} was created successfully.`,
+      );
+
       setPassword("");
-      setRole("Employee");
       setDepartmentId("");
       setEmployeeId("");
+      setFullName("");
+      setEmail("");
+      setRole("Employee");
+
+      const refreshedEmployees:
+        AvailableEmployee[] =
+        await getAvailableEmployees();
+
+      setAvailableEmployees(
+        refreshedEmployees,
+      );
     } catch (
       caughtError: unknown
     ) {
-      setError(
+      const message: string =
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to create user.",
-      );
+          : "Unable to create user.";
+
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -276,7 +401,10 @@ export default function CreateUserPage():
       <Container
         maxWidth="md"
         sx={{
-          py: 5,
+          py: {
+            xs: 3,
+            md: 5,
+          },
         }}
       >
         <Stack spacing={3}>
@@ -292,45 +420,100 @@ export default function CreateUserPage():
                 "1px solid",
               borderColor:
                 "divider",
+              background:
+                "linear-gradient(135deg, #FFFFFF 0%, #F7F7FB 100%)",
             }}
           >
-            <Stack
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: {
+                  xs: "column",
+                  sm: "row",
+                },
+                justifyContent:
+                  "space-between",
+                alignItems: {
+                  xs: "stretch",
+                  sm: "center",
+                },
+                gap: 2,
+              }}
+            >
+              <Stack
                 direction="row"
                 spacing={2}
                 sx={{
-                    alignItems: "center",
-                }}
-            >
-              <Avatar
-                sx={{
-                  width: 50,
-                  height: 50,
-                  bgcolor:
-                    "primary.main",
+                  alignItems:
+                    "center",
                 }}
               >
-                <ManageAccountsIcon />
-              </Avatar>
-
-              <Box>
-                <Typography
-                  variant="h4"
+                <Avatar
                   sx={{
-                    fontWeight: 700,
+                    width: 54,
+                    height: 54,
+                    bgcolor:
+                      "primary.main",
                   }}
                 >
-                  Create User
-                </Typography>
+                  <ManageAccountsIcon />
+                </Avatar>
 
-                <Typography
-                  color="text.secondary"
-                >
-                  Create an application
-                  account and assign its
-                  access role.
-                </Typography>
-              </Box>
-            </Stack>
+                <Box>
+                  <Typography
+                    component="h1"
+                    variant="h4"
+                    sx={{
+                      fontWeight: 700,
+                    }}
+                  >
+                    Create User
+                  </Typography>
+
+                  <Typography
+                    color="text.secondary"
+                  >
+                    Create an application
+                    account and assign its
+                    access role.
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <Tooltip title="Refresh available employees">
+                <span>
+                  <IconButton
+                    type="button"
+                    disabled={
+                      loading ||
+                      saving
+                    }
+                    onClick={() =>
+                      void loadFormData()
+                    }
+                    sx={{
+                      alignSelf: {
+                        xs:
+                          "flex-start",
+                        sm: "center",
+                      },
+                      border:
+                        "1px solid",
+                      borderColor:
+                        "divider",
+                    }}
+                  >
+                    {loading ? (
+                      <CircularProgress
+                        size={22}
+                      />
+                    ) : (
+                      <RefreshIcon />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Box>
           </Paper>
 
           {error && (
@@ -339,6 +522,9 @@ export default function CreateUserPage():
               onClose={() =>
                 setError("")
               }
+              sx={{
+                borderRadius: 2,
+              }}
             >
               {error}
             </Alert>
@@ -357,8 +543,9 @@ export default function CreateUserPage():
             {loading ? (
               <Box
                 sx={{
-                  py: 6,
-                  textAlign:
+                  py: 8,
+                  display: "flex",
+                  justifyContent:
                     "center",
                 }}
               >
@@ -368,7 +555,8 @@ export default function CreateUserPage():
               <Box
                 component="form"
                 onSubmit={(
-                  event,
+                  event:
+                    React.FormEvent<HTMLFormElement>,
                 ) =>
                   void handleSubmit(
                     event,
@@ -376,53 +564,6 @@ export default function CreateUserPage():
                 }
               >
                 <Stack spacing={3}>
-                  <TextField
-                    required
-                    fullWidth
-                    label="Full name"
-                    value={fullName}
-                    onChange={(
-                      event,
-                    ) =>
-                      setFullName(
-                        event.target
-                          .value,
-                      )
-                    }
-                  />
-
-                  <TextField
-                    required
-                    fullWidth
-                    type="email"
-                    label="Email"
-                    value={email}
-                    onChange={(
-                      event,
-                    ) =>
-                      setEmail(
-                        event.target
-                          .value,
-                      )
-                    }
-                  />
-
-                  <TextField
-                    required
-                    fullWidth
-                    type="password"
-                    label="Password"
-                    value={password}
-                    onChange={(
-                      event,
-                    ) =>
-                      setPassword(
-                        event.target
-                          .value,
-                      )
-                    }
-                  />
-
                   <FormControl
                     fullWidth
                   >
@@ -433,6 +574,7 @@ export default function CreateUserPage():
                     <Select
                       label="Role"
                       value={role}
+                      disabled={saving}
                       onChange={(
                         event,
                       ) =>
@@ -456,113 +598,214 @@ export default function CreateUserPage():
                     </Select>
                   </FormControl>
 
-                  {role !==
-                    "SuperAdmin" && (
-                    <FormControl
-                      fullWidth
-                    >
-                      <InputLabel>
-                        Department
-                      </InputLabel>
-
-                      <Select
-                        label="Department"
-                        value={
-                          departmentId
-                        }
-                        onChange={(
-                          event,
-                        ) => {
-                          setDepartmentId(
-                            event.target
-                              .value,
-                          );
-
-                          setEmployeeId(
-                            "",
-                          );
-                        }}
+                  {requiresEmployee && (
+                    <>
+                      <FormControl
+                        fullWidth
                       >
-                        {departments.map(
-                          (
-                            department:
-                              Department,
-                          ) => (
-                            <MenuItem
-                              key={
-                                department.id
-                              }
-                              value={
-                                department.id
-                              }
-                            >
-                              {
-                                department.name
-                              }
-                            </MenuItem>
-                          ),
-                        )}
-                      </Select>
-                    </FormControl>
-                  )}
+                        <InputLabel>
+                          Department
+                        </InputLabel>
 
-                  {role !==
-                    "SuperAdmin" && (
-                    <FormControl
-                      fullWidth
-                      disabled={
-                        !departmentId
-                      }
-                    >
-                      <InputLabel>
-                        Employee
-                      </InputLabel>
+                        <Select
+                          label="Department"
+                          value={
+                            departmentId
+                          }
+                          disabled={saving}
+                          onChange={(
+                            event,
+                          ) =>
+                            handleDepartmentChange(
+                              event.target
+                                .value,
+                            )
+                          }
+                        >
+                          {departments.map(
+                            (
+                              department:
+                                Department,
+                            ) => (
+                              <MenuItem
+                                key={
+                                  department.id
+                                }
+                                value={
+                                  department.id
+                                }
+                              >
+                                {
+                                  department.name
+                                }
+                              </MenuItem>
+                            ),
+                          )}
+                        </Select>
+                      </FormControl>
 
-                      <Select
-                        label="Employee"
-                        value={
-                          employeeId
-                        }
-                        onChange={(
-                          event,
-                        ) =>
-                          setEmployeeId(
-                            event.target
-                              .value,
-                          )
+                      <FormControl
+                        fullWidth
+                        disabled={
+                          saving ||
+                          !departmentId
                         }
                       >
-                        {availableEmployees.map(
-                          (
-                            employee:
-                              Employee,
-                          ) => (
-                            <MenuItem
-                              key={
-                                employee.id
-                              }
-                              value={
-                                employee.id
-                              }
-                            >
-                              {employee.fullName ||
-                                employee.email}
-                            </MenuItem>
-                          ),
+                        <InputLabel>
+                          Employee
+                        </InputLabel>
+
+                        <Select
+                          label="Employee"
+                          value={
+                            employeeId
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            handleEmployeeChange(
+                              event.target
+                                .value,
+                            )
+                          }
+                        >
+                          {employeesForSelectedDepartment.map(
+                            (
+                              employee:
+                                AvailableEmployee,
+                            ) => (
+                              <MenuItem
+                                key={
+                                  employee.id
+                                }
+                                value={
+                                  employee.id
+                                }
+                              >
+                                {employee.fullName}
+                                {" — "}
+                                {employee.email}
+                              </MenuItem>
+                            ),
+                          )}
+                        </Select>
+                      </FormControl>
+
+                      {departmentId &&
+                        employeesForSelectedDepartment
+                          .length ===
+                          0 && (
+                          <Alert
+                            severity="info"
+                            sx={{
+                              borderRadius:
+                                2,
+                            }}
+                          >
+                            All employees
+                            in this
+                            department
+                            already have
+                            user accounts,
+                            or no employees
+                            are assigned to
+                            it.
+                          </Alert>
                         )}
-                      </Select>
-                    </FormControl>
+                    </>
                   )}
+
+                  <TextField
+                    required
+                    fullWidth
+                    label="Full name"
+                    value={fullName}
+                    disabled={
+                      saving ||
+                      requiresEmployee
+                    }
+                    helperText={
+                      requiresEmployee
+                        ? "Filled automatically from the selected employee."
+                        : undefined
+                    }
+                    onChange={(
+                      event:
+                        React.ChangeEvent<HTMLInputElement>,
+                    ) =>
+                      setFullName(
+                        event.target
+                          .value,
+                      )
+                    }
+                  />
+
+                  <TextField
+                    required
+                    fullWidth
+                    type="email"
+                    label="Email"
+                    value={email}
+                    disabled={
+                      saving ||
+                      requiresEmployee
+                    }
+                    helperText={
+                      requiresEmployee
+                        ? "Filled automatically from the selected employee."
+                        : undefined
+                    }
+                    onChange={(
+                      event:
+                        React.ChangeEvent<HTMLInputElement>,
+                    ) =>
+                      setEmail(
+                        event.target
+                          .value,
+                      )
+                    }
+                  />
+
+                  <TextField
+                    required
+                    fullWidth
+                    type="password"
+                    label="Temporary password"
+                    value={password}
+                    disabled={saving}
+                    helperText="Use at least 6 characters and follow the configured password policy."
+                    onChange={(
+                      event:
+                        React.ChangeEvent<HTMLInputElement>,
+                    ) =>
+                      setPassword(
+                        event.target
+                          .value,
+                      )
+                    }
+                  />
 
                   <Button
                     type="submit"
                     variant="contained"
                     size="large"
+                    disableElevation
                     disabled={saving}
+                    startIcon={
+                      saving ? (
+                        <CircularProgress
+                          size={18}
+                          color="inherit"
+                        />
+                      ) : (
+                        <ManageAccountsIcon />
+                      )
+                    }
                     sx={{
                       alignSelf:
                         "flex-start",
                       px: 4,
+                      borderRadius: 2,
                     }}
                   >
                     {saving
@@ -581,9 +824,19 @@ export default function CreateUserPage():
           successMessage,
         )}
         autoHideDuration={4000}
-        onClose={() =>
-          setSuccessMessage("")
-        }
+        onClose={(
+          _event,
+          reason,
+        ) => {
+          if (
+            reason ===
+            "clickaway"
+          ) {
+            return;
+          }
+
+          setSuccessMessage("");
+        }}
         anchorOrigin={{
           vertical: "bottom",
           horizontal: "right",
@@ -595,6 +848,10 @@ export default function CreateUserPage():
           onClose={() =>
             setSuccessMessage("")
           }
+          sx={{
+            width: "100%",
+            borderRadius: 2,
+          }}
         >
           {successMessage}
         </Alert>

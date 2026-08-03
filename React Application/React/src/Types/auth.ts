@@ -49,5 +49,15 @@ export interface StoredUser {
 
 export interface ApiErrorResponse {
   message?: string;
-  errors?: string[];
+  title?: string;
+  errors?:
+    | string[]
+    | Record<string, string[]>;
+}
+
+export interface AvailableEmployee {
+  id: string;
+  fullName: string;
+  email: string;
+  departmentId?: string | null;
 }
