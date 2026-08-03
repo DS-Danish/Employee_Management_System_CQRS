@@ -17,18 +17,24 @@ public sealed class Project
         Description = description;
         StartDate = startDate;
         EndDate = endDate;
+
+        Status = ProjectStatus.Active;
+
         CreatedAtUtc = DateTime.UtcNow;
     }
 
     public Guid Id { get; private set; }
 
-    public string Name { get; private set; } = string.Empty;
+    public string Name { get; private set; } =
+        string.Empty;
 
     public string? Description { get; private set; }
 
     public DateTime StartDate { get; private set; }
 
     public DateTime? EndDate { get; private set; }
+
+    public ProjectStatus Status { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
 
@@ -42,5 +48,17 @@ public sealed class Project
         Description = description;
         StartDate = startDate;
         EndDate = endDate;
+    }
+
+    public bool MarkAsCompleted()
+    {
+        if (Status == ProjectStatus.Completed)
+        {
+            return false;
+        }
+
+        Status = ProjectStatus.Completed;
+
+        return true;
     }
 }

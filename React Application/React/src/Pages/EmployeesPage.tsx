@@ -18,6 +18,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   CircularProgress,
@@ -39,6 +40,7 @@ import {
   Stack,
   Tooltip,
   Typography,
+  alpha,
 } from "@mui/material";
 
 import { CreateEmployeeModal } from "../Components/CreateEmployeeModal";
@@ -68,11 +70,29 @@ import type {
   Project,
 } from "../Types/project";
 
+import type {
+  StoredUser,
+} from "../Types/auth";
+
+// Each stat gets its own accent so the row scans as three distinct
+// signals rather than three repeats of the theme's primary color.
+type StatAccent = "indigo" | "violet" | "teal";
+
+const STAT_ACCENTS: Record<
+  StatAccent,
+  { main: string; soft: string }
+> = {
+  indigo: { main: "#4F46E5", soft: "#EEF0FD" },
+  violet: { main: "#7C3AED", soft: "#F3EDFD" },
+  teal: { main: "#0D9488", soft: "#E6F5F3" },
+};
+
 interface SummaryStatProps {
   icon: ReactNode;
   label: string;
   value: number;
   loading: boolean;
+  accent: StatAccent;
 }
 
 function SummaryStat({
@@ -80,31 +100,43 @@ function SummaryStat({
   label,
   value,
   loading,
+  accent,
 }: SummaryStatProps) {
+  const { main, soft } = STAT_ACCENTS[accent];
+
   return (
     <Paper
-      variant="outlined"
+      elevation={0}
       sx={{
-        px: 2.5,
-        py: 2,
+        px: 2.75,
+        py: 2.25,
         display: "flex",
         alignItems: "center",
         gap: 2,
-        borderRadius: 2,
+        borderRadius: 2.5,
         flex: 1,
-        minWidth: 180,
+        minWidth: 200,
+        border: "1px solid",
+        borderColor: "divider",
+        transition:
+          "border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease",
+        "&:hover": {
+          borderColor: alpha(main, 0.35),
+          boxShadow: `0 4px 16px ${alpha(main, 0.12)}`,
+          transform: "translateY(-1px)",
+        },
       }}
     >
       <Box
         sx={{
-          width: 44,
-          height: 44,
-          borderRadius: "50%",
+          width: 46,
+          height: 46,
+          borderRadius: "14px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          bgcolor: "primary.main",
-          color: "primary.contrastText",
+          bgcolor: soft,
+          color: main,
           flexShrink: 0,
         }}
       >
@@ -120,6 +152,7 @@ function SummaryStat({
             sx={{
               fontWeight: 700,
               lineHeight: 1.2,
+              letterSpacing: -0.5,
             }}
           >
             {value}
@@ -139,6 +172,12 @@ function SummaryStat({
 }
 
 export function EmployeesPage() {
+  const currentUser =
+    getStoredUser();
+
+  const canDeleteEmployees =
+    currentUser?.role === "SuperAdmin";
+
   const [employees, setEmployees] =
     useState<Employee[]>([]);
 
@@ -408,335 +447,403 @@ export function EmployeesPage() {
     );
 
   return (
-    <Container maxWidth="xl" sx={{ py: 5 }}>
-      <Stack spacing={3}>
-        <Box
-          sx={{
-            alignItems: {
-              xs: "stretch",
-              sm: "center",
-            },
-            display: "flex",
-            flexDirection: {
-              xs: "column",
-              sm: "row",
-            },
-            justifyContent: "space-between",
-            gap: 2,
-          }}
-        >
-          <Box>
-            <Typography
-              component="h1"
-              variant="h4"
+    <Box sx={{ bgcolor: "#FAFAFA", minHeight: "100%" }}>
+      <Container maxWidth="xl" sx={{ py: 5 }}>
+        <Stack spacing={3}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2.5, sm: 3.5 },
+              borderRadius: 3,
+              border: "1px solid",
+              borderColor: "divider",
+              background:
+                "linear-gradient(135deg, #FFFFFF 0%, #F7F7FB 100%)",
+            }}
+          >
+            <Box
               sx={{
-                fontWeight: 700,
-                letterSpacing: -0.5,
+                alignItems: {
+                  xs: "stretch",
+                  sm: "center",
+                },
+                display: "flex",
+                flexDirection: {
+                  xs: "column",
+                  sm: "row",
+                },
+                justifyContent: "space-between",
+                gap: 2,
               }}
             >
-              Employee Management
-            </Typography>
-
-            <Typography color="text.secondary">
-              Manage employees, departments and project
-              assignments in one place.
-            </Typography>
-          </Box>
-
-          <Stack direction="row" spacing={1}>
-            <Tooltip title="Refresh">
-              <span>
-                <IconButton
-                  aria-label="Refresh employees"
-                  disabled={loading}
-                  onClick={() => void loadData()}
+              <Box>
+                <Typography
+                  component="h1"
+                  variant="h4"
                   sx={{
-                    border: "1px solid",
-                    borderColor: "divider",
+                    fontWeight: 700,
+                    letterSpacing: -0.6,
                   }}
                 >
-                  <RefreshIcon />
-                </IconButton>
-              </span>
-            </Tooltip>
+                  Employee Management
+                </Typography>
 
-            <Button
-              type="button"
-              variant="contained"
-              disableElevation
-              startIcon={<AddIcon />}
-              onClick={() =>
-                setCreateModalOpen(true)
-              }
-            >
-              Add employee
-            </Button>
-          </Stack>
-        </Box>
+                <Typography
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  Manage employees, departments and project
+                  assignments in one place.
+                </Typography>
+              </Box>
 
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-        >
-          <SummaryStat
-            icon={<PeopleAltIcon />}
-            label="Employees"
-            value={employees.length}
-            loading={loading}
-          />
-
-          <SummaryStat
-            icon={<ApartmentIcon />}
-            label="Departments"
-            value={departments.length}
-            loading={loading}
-          />
-
-          <SummaryStat
-            icon={<GroupsIcon />}
-            label="Active projects"
-            value={projects.length}
-            loading={loading}
-          />
-        </Stack>
-
-        {error && (
-          <Alert
-            severity="error"
-            onClose={() => setError("")}
-          >
-            {error}
-          </Alert>
-        )}
-
-        {!loading && employees.length === 0 ? (
-          <Paper
-            variant="outlined"
-            sx={{
-              py: 8,
-              px: 3,
-              textAlign: "center",
-              borderRadius: 2,
-              borderStyle: "dashed",
-            }}
-          >
-            <GroupsIcon
-              sx={{
-                fontSize: 48,
-                color: "text.disabled",
-                mb: 1,
-              }}
-            />
-
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 600 }}
-            >
-              No employees yet
-            </Typography>
-
-            <Typography
-              color="text.secondary"
-              sx={{ mb: 3 }}
-            >
-              Add your first employee to start assigning
-              departments and projects.
-            </Typography>
-
-            <Button
-              type="button"
-              variant="contained"
-              disableElevation
-              startIcon={<AddIcon />}
-              onClick={() =>
-                setCreateModalOpen(true)
-              }
-            >
-              Add employee
-            </Button>
-          </Paper>
-        ) : (
-          <Paper
-            variant="outlined"
-            sx={{
-              borderRadius: 2,
-              overflow: "hidden",
-            }}
-          >
-            <EmployeeTable
-              employees={employees}
-              loading={loading}
-              deletingEmployeeId={deletingEmployeeId}
-              renderActions={(employee: Employee) => (
-                <Tooltip title="Employee actions">
+              <Stack direction="row" spacing={1}>
+                <Tooltip title="Refresh">
                   <span>
                     <IconButton
-                      aria-label={`Actions for ${
-                        employee.fullName ||
-                        employee.email
-                      }`}
-                      disabled={
-                        deletingEmployeeId ===
-                        employee.id
-                      }
-                      onClick={(
-                        event: MouseEvent<HTMLButtonElement>,
-                      ) =>
-                        handleMenuOpen(
-                          event,
-                          employee,
-                        )
-                      }
+                      aria-label="Refresh employees"
+                      disabled={loading}
+                      onClick={() => void loadData()}
+                      sx={{
+                        border: "1px solid",
+                        borderColor: "divider",
+                        bgcolor: "background.paper",
+                      }}
                     >
-                      <MoreVertIcon />
+                      <RefreshIcon />
                     </IconButton>
                   </span>
                 </Tooltip>
-              )}
-            />
+
+                <Button
+                  type="button"
+                  variant="contained"
+                  disableElevation
+                  startIcon={<AddIcon />}
+                  onClick={() =>
+                    setCreateModalOpen(true)
+                  }
+                  sx={{ borderRadius: 2, px: 2.5 }}
+                >
+                  Add employee
+                </Button>
+              </Stack>
+            </Box>
           </Paper>
-        )}
-      </Stack>
 
-      <Menu
-        anchorEl={menuAnchorElement}
-        open={Boolean(menuAnchorElement)}
-        onClose={handleMenuClose}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "right",
-        }}
-        transformOrigin={{
-          vertical: "top",
-          horizontal: "right",
-        }}
-      >
-        <MenuItem onClick={handleEditOpen}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-
-          <ListItemText>
-            Edit employee
-          </ListItemText>
-        </MenuItem>
-
-        <Divider />
-
-        <MenuItem
-          disabled={
-            selectedEmployee !== null &&
-            deletingEmployeeId === selectedEmployee.id
-          }
-          onClick={handleMenuDelete}
-          sx={{ color: "error.main" }}
-        >
-          <ListItemIcon>
-            <DeleteIcon
-              fontSize="small"
-              color="error"
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+          >
+            <SummaryStat
+              icon={<PeopleAltIcon />}
+              label="Employees"
+              value={employees.length}
+              loading={loading}
+              accent="indigo"
             />
-          </ListItemIcon>
 
-          <ListItemText>
-            Delete employee
-          </ListItemText>
-        </MenuItem>
-      </Menu>
+            <SummaryStat
+              icon={<ApartmentIcon />}
+              label="Departments"
+              value={departments.length}
+              loading={loading}
+              accent="violet"
+            />
 
-      <Dialog
-        open={Boolean(pendingDeletion)}
-        onClose={handleCancelDelete}
-        maxWidth="xs"
-        fullWidth
-        disableEscapeKeyDown={
-          isDeletingPendingEmployee
-        }
-      >
-        <DialogTitle sx={{ fontWeight: 700 }}>
-          Delete employee?
-        </DialogTitle>
+            <SummaryStat
+              icon={<GroupsIcon />}
+              label="Active projects"
+              value={projects.length}
+              loading={loading}
+              accent="teal"
+            />
+          </Stack>
 
-        <DialogContent>
-          <DialogContentText>
-            {pendingDeletionName
-              ? `${pendingDeletionName} will be permanently removed, along with their project assignments. This can't be undone.`
-              : "This employee will be permanently removed. This can't be undone."}
-          </DialogContentText>
-        </DialogContent>
+          {error && (
+            <Alert
+              severity="error"
+              onClose={() => setError("")}
+              sx={{ borderRadius: 2 }}
+            >
+              {error}
+            </Alert>
+          )}
 
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button
-            type="button"
-            disabled={isDeletingPendingEmployee}
-            onClick={handleCancelDelete}
-          >
-            Cancel
-          </Button>
+          {!loading && employees.length === 0 ? (
+            <Paper
+              variant="outlined"
+              sx={{
+                py: 8,
+                px: 3,
+                textAlign: "center",
+                borderRadius: 3,
+                borderStyle: "dashed",
+                bgcolor: "background.paper",
+              }}
+            >
+              <Avatar
+                sx={{
+                  width: 64,
+                  height: 64,
+                  mx: "auto",
+                  mb: 2,
+                  bgcolor: STAT_ACCENTS.indigo.soft,
+                  color: STAT_ACCENTS.indigo.main,
+                }}
+              >
+                <GroupsIcon sx={{ fontSize: 32 }} />
+              </Avatar>
 
-          <Button
-            type="button"
-            color="error"
-            variant="contained"
-            disableElevation
-            disabled={isDeletingPendingEmployee}
-            startIcon={
-              isDeletingPendingEmployee ? (
-                <CircularProgress
-                  size={18}
-                  color="inherit"
-                />
-              ) : (
-                <DeleteIcon />
-              )
-            }
-            onClick={() =>
-              void handleConfirmDelete()
-            }
-          >
-            {isDeletingPendingEmployee
-              ? "Deleting..."
-              : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 600 }}
+              >
+                No employees yet
+              </Typography>
 
-      <CreateEmployeeModal
-        open={createModalOpen}
-        departments={departments}
-        projects={projects}
-        onClose={() =>
-          setCreateModalOpen(false)
-        }
-        onCreated={handleEmployeeCreated}
-      />
+              <Typography
+                color="text.secondary"
+                sx={{ mb: 3, maxWidth: 420, mx: "auto" }}
+              >
+                Add your first employee to start assigning
+                departments and projects.
+              </Typography>
 
-      <EditEmployeeModal
-        open={editModalOpen}
-        employee={selectedEmployee}
-        departments={departments}
-        projects={projects}
-        onClose={handleEditClose}
-        onUpdated={handleEmployeeUpdated}
-      />
+              <Button
+                type="button"
+                variant="contained"
+                disableElevation
+                startIcon={<AddIcon />}
+                onClick={() =>
+                  setCreateModalOpen(true)
+                }
+                sx={{ borderRadius: 2, px: 2.5 }}
+              >
+                Add employee
+              </Button>
+            </Paper>
+          ) : (
+            <Paper
+              variant="outlined"
+              sx={{
+                borderRadius: 3,
+                overflow: "hidden",
+              }}
+            >
+              <EmployeeTable
+                employees={employees}
+                loading={loading}
+                deletingEmployeeId={deletingEmployeeId}
+                renderActions={(employee: Employee) => (
+                  <Tooltip title="Employee actions">
+                    <span>
+                      <IconButton
+                        aria-label={`Actions for ${
+                          employee.fullName ||
+                          employee.email
+                        }`}
+                        disabled={
+                          deletingEmployeeId ===
+                          employee.id
+                        }
+                        onClick={(
+                          event: MouseEvent<HTMLButtonElement>,
+                        ) =>
+                          handleMenuOpen(
+                            event,
+                            employee,
+                          )
+                        }
+                      >
+                        <MoreVertIcon />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                )}
+              />
+            </Paper>
+          )}
+        </Stack>
 
-      <Snackbar
-        open={Boolean(successMessage)}
-        autoHideDuration={4000}
-        onClose={() => setSuccessMessage("")}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "right",
-        }}
-      >
-        <Alert
-          severity="success"
-          variant="filled"
-          onClose={() => setSuccessMessage("")}
+        <Menu
+          anchorEl={menuAnchorElement}
+          open={Boolean(menuAnchorElement)}
+          onClose={handleMenuClose}
+          anchorOrigin={{
+            vertical: "bottom",
+            horizontal: "right",
+          }}
+          transformOrigin={{
+            vertical: "top",
+            horizontal: "right",
+          }}
+          slotProps={{
+            paper: {
+              sx: {
+                borderRadius: 2,
+                minWidth: 180,
+              },
+            },
+          }}
         >
-          {successMessage}
-        </Alert>
-      </Snackbar>
-    </Container>
+          <MenuItem onClick={handleEditOpen}>
+            <ListItemIcon>
+              <EditIcon fontSize="small" />
+            </ListItemIcon>
+
+            <ListItemText>
+              Edit employee
+            </ListItemText>
+          </MenuItem>
+
+          {canDeleteEmployees && (
+            <>
+              <Divider />
+
+              <MenuItem
+                disabled={
+                  selectedEmployee !== null &&
+                  deletingEmployeeId === selectedEmployee.id
+                }
+                onClick={handleMenuDelete}
+                sx={{ color: "error.main" }}
+              >
+                <ListItemIcon>
+                  <DeleteIcon
+                    fontSize="small"
+                    color="error"
+                  />
+                </ListItemIcon>
+
+                <ListItemText>
+                  Delete employee
+                </ListItemText>
+              </MenuItem>
+            </>
+          )}
+        </Menu>
+
+        {canDeleteEmployees && (
+          <Dialog
+            open={Boolean(pendingDeletion)}
+            onClose={handleCancelDelete}
+            maxWidth="xs"
+            fullWidth
+            slotProps={{
+              paper: {
+                sx: {
+                  borderRadius: 3,
+                },
+              },
+            }}
+          >
+          <DialogTitle sx={{ fontWeight: 700 }}>
+            Delete employee?
+          </DialogTitle>
+
+          <DialogContent>
+            <DialogContentText>
+              {pendingDeletionName
+                ? `${pendingDeletionName} will be permanently removed, along with their project assignments. This can't be undone.`
+                : "This employee will be permanently removed. This can't be undone."}
+            </DialogContentText>
+          </DialogContent>
+
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              type="button"
+              disabled={isDeletingPendingEmployee}
+              onClick={handleCancelDelete}
+              sx={{ borderRadius: 2 }}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="button"
+              color="error"
+              variant="contained"
+              disableElevation
+              disabled={isDeletingPendingEmployee}
+              startIcon={
+                isDeletingPendingEmployee ? (
+                  <CircularProgress
+                    size={18}
+                    color="inherit"
+                  />
+                ) : (
+                  <DeleteIcon />
+                )
+              }
+              onClick={() =>
+                void handleConfirmDelete()
+              }
+              sx={{ borderRadius: 2 }}
+            >
+              {isDeletingPendingEmployee
+                ? "Deleting..."
+                : "Delete"}
+            </Button>
+          </DialogActions>
+          </Dialog>
+        )}
+
+        <CreateEmployeeModal
+          open={createModalOpen}
+          departments={departments}
+          projects={projects}
+          onClose={() =>
+            setCreateModalOpen(false)
+          }
+          onCreated={handleEmployeeCreated}
+        />
+
+        <EditEmployeeModal
+          open={editModalOpen}
+          employee={selectedEmployee}
+          departments={departments}
+          projects={projects}
+          onClose={handleEditClose}
+          onUpdated={handleEmployeeUpdated}
+        />
+
+        <Snackbar
+          open={Boolean(successMessage)}
+          autoHideDuration={4000}
+          onClose={() => setSuccessMessage("")}
+          anchorOrigin={{
+            vertical: "bottom",
+            horizontal: "right",
+          }}
+        >
+          <Alert
+            severity="success"
+            variant="filled"
+            onClose={() => setSuccessMessage("")}
+            sx={{ borderRadius: 2 }}
+          >
+            {successMessage}
+          </Alert>
+        </Snackbar>
+      </Container>
+    </Box>
   );
+}
+
+function getStoredUser(): StoredUser | null {
+  const storedUserJson =
+    localStorage.getItem("authUser");
+
+  if (!storedUserJson) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(
+      storedUserJson,
+    ) as StoredUser;
+  } catch {
+    return null;
+  }
 }

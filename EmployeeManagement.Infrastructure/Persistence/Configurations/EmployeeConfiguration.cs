@@ -32,6 +32,9 @@ public sealed class EmployeeConfiguration
         builder.Property(employee => employee.DepartmentId)
             .IsRequired(false);
 
+        builder.Property(employee => employee.TeamLeadId)
+            .IsRequired(false);
+
         builder.HasIndex(employee => employee.Email)
             .IsUnique();
 
@@ -42,6 +45,8 @@ public sealed class EmployeeConfiguration
         });
 
         builder.HasIndex(employee => employee.DepartmentId);
+
+        builder.HasIndex(employee => employee.TeamLeadId);
 
         builder.OwnsOne(
             employee => employee.Address,
@@ -77,5 +82,10 @@ public sealed class EmployeeConfiguration
             .WithMany()
             .HasForeignKey(employee => employee.DepartmentId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(employee => employee.TeamLead)
+            .WithMany(employee => employee.TeamMembers)
+            .HasForeignKey(employee => employee.TeamLeadId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

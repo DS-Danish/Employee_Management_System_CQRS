@@ -1,5 +1,6 @@
 using EmployeeManagement.Application.Abstractions;
 using EmployeeManagement.Application.Projects.DTOs;
+using EmployeeManagement.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,13 +26,18 @@ public sealed class GetProjectsQueryHandler
         return await _dbContext.Projects
             .AsNoTracking()
             .OrderBy(x => x.Name)
-            .Select(x => new ProjectDto(
-                x.Id,
-                x.Name,
-                x.Description,
-                x.StartDate,
-                x.EndDate,
-                x.CreatedAtUtc))
-            .ToListAsync(cancellationToken);
+            .Select(
+                x => new ProjectDto(
+                    x.Id,
+                    x.Name,
+                    x.Description,
+                    x.StartDate,
+                    x.EndDate,
+                    x.CreatedAtUtc,
+                    x.Status == ProjectStatus.Completed
+                        ? "Completed"
+                        : "Active"))
+            .ToListAsync(
+                cancellationToken);
     }
 }

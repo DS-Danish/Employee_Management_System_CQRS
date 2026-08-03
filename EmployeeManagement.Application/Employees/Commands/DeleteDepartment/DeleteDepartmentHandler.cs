@@ -1,4 +1,5 @@
 using EmployeeManagement.Application.Abstractions;
+using EmployeeManagement.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,19 +20,36 @@ public sealed class DeleteDepartmentHandler
         DeleteDepartment request,
         CancellationToken cancellationToken)
     {
-        var department = await _dbContext.Departments
-            .FirstOrDefaultAsync(
-                x => x.Id == request.Id,
-                cancellationToken);
+        Department? department =
+            await _dbContext.Departments
+                .FirstOrDefaultAsync(
+                    currentDepartment =>
+                        currentDepartment.Id == request.Id,
+                    cancellationToken);
 
         if (department is null)
         {
             return false;
         }
 
-        _dbContext.Departments.Remove(department);
+        List<Employee> employees =
+            await _dbContext.Employees
+                .Where(
+                    employee =>
+                        employee.DepartmentId == request.Id)
+                .ToListAsync(
+                    cancellationToken);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        foreach (Employee employee in employees)
+        {
+            employee.AssignDepartment(null);
+        }
+
+        _dbContext.Departments.Remove(
+            department);
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
         return true;
     }

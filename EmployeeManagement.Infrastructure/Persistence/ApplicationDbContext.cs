@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EmployeeManagement.Infrastructure.Persistence;
 
-public sealed class ApplicationDbContext
+public class ApplicationDbContext
     : IdentityDbContext<ApplicationUser>,
       IApplicationDbContext
 {
@@ -43,14 +43,24 @@ public sealed class ApplicationDbContext
             entity =>
             {
                 entity.Property(user => user.FullName)
-                    .HasMaxLength(100)
+                    .HasMaxLength(200)
                     .IsRequired();
 
                 entity.HasIndex(user => user.EmployeeId)
                     .IsUnique()
                     .HasFilter("[EmployeeId] IS NOT NULL");
 
-                entity.HasIndex(user => user.DepartmentId);
+                entity.HasOne<Employee>()
+                    .WithOne()
+                    .HasForeignKey<ApplicationUser>(
+                        user => user.EmployeeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne<Department>()
+                    .WithMany()
+                    .HasForeignKey(
+                        user => user.DepartmentId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
     }
 }

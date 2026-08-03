@@ -2,18 +2,17 @@ namespace EmployeeManagement.Infrastructure.Identity;
 
 public sealed class JwtSettings
 {
-    public const string SectionName =
-        "Jwt";
+    public const string SectionName = "Jwt";
 
-    public string Key { get; init; } =
+    public string Key { get; set; } =
         string.Empty;
 
-    public string Issuer { get; init; } =
+    public string Issuer { get; set; } =
         string.Empty;
 
-    public string Audience { get; init; } =
+    public string Audience { get; set; } =
         string.Empty;
 
-    public int ExpirationMinutes { get; init; } =
+    public int ExpirationMinutes { get; set; } =
         60;
 }

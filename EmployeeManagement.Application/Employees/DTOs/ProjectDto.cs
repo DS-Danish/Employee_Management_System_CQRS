@@ -6,4 +6,5 @@ public sealed record ProjectDto(
     string? Description,
     DateTime StartDate,
     DateTime? EndDate,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    string Status);

@@ -71,12 +71,17 @@ namespace EmployeeManagement.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid?>("TeamLeadId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DepartmentId");
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("TeamLeadId");
 
                     b.HasIndex("FirstName", "LastName");
 
@@ -166,6 +171,9 @@ namespace EmployeeManagement.Infrastructure.Migrations
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
@@ -201,8 +209,8 @@ namespace EmployeeManagement.Infrastructure.Migrations
 
                     b.Property<string>("FullName")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
@@ -396,6 +404,11 @@ namespace EmployeeManagement.Infrastructure.Migrations
                         .HasForeignKey("DepartmentId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("EmployeeManagement.Domain.Entities.Employee", "TeamLead")
+                        .WithMany("TeamMembers")
+                        .HasForeignKey("TeamLeadId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.OwnsOne("EmployeeManagement.Domain.Entities.Address", "Address", b1 =>
                         {
                             b1.Property<Guid>("EmployeeId")
@@ -439,6 +452,8 @@ namespace EmployeeManagement.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Department");
+
+                    b.Navigation("TeamLead");
                 });
 
             modelBuilder.Entity("EmployeeManagement.Domain.Entities.EmployeeDetail", b =>
@@ -469,6 +484,19 @@ namespace EmployeeManagement.Infrastructure.Migrations
                     b.Navigation("Employee");
 
                     b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("EmployeeManagement.Infrastructure.Identity.ApplicationUser", b =>
+                {
+                    b.HasOne("EmployeeManagement.Domain.Entities.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EmployeeManagement.Domain.Entities.Employee", null)
+                        .WithOne()
+                        .HasForeignKey("EmployeeManagement.Infrastructure.Identity.ApplicationUser", "EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -520,6 +548,11 @@ namespace EmployeeManagement.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("EmployeeManagement.Domain.Entities.Employee", b =>
+                {
+                    b.Navigation("TeamMembers");
                 });
 #pragma warning restore 612, 618
         }

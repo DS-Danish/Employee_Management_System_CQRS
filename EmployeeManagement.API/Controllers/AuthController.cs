@@ -2,7 +2,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using EmployeeManagement.Application.Authentication;
-using EmployeeManagement.Application.Common.Constants;
 using EmployeeManagement.Domain.Entities;
 using EmployeeManagement.Infrastructure.Identity;
 using EmployeeManagement.Infrastructure.Persistence;
@@ -12,11 +11,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using EmployeeManagement.Application.Common.Constants;
 
 namespace EmployeeManagement.API.Controllers;
 
 [ApiController]
-[AllowAnonymous]
 [Route("api/auth")]
 public sealed class AuthController : ControllerBase
 {
@@ -40,6 +39,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     [ProducesResponseType(
         typeof(LoginResponse),
         StatusCodes.Status200OK)]
@@ -47,18 +47,18 @@ public sealed class AuthController : ControllerBase
         StatusCodes.Status400BadRequest)]
     [ProducesResponseType(
         StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<LoginResponse>>
-        Login(
-            [FromBody] LoginRequest request)
+    public async Task<ActionResult<LoginResponse>> Login(
+        [FromBody] LoginRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Email) ||
             string.IsNullOrWhiteSpace(request.Password))
         {
-            return BadRequest(new
-            {
-                message =
-                    "Email and password are required."
-            });
+            return BadRequest(
+                new
+                {
+                    message =
+                        "Email and password are required."
+                });
         }
 
         string normalizedEmail =
@@ -72,11 +72,12 @@ public sealed class AuthController : ControllerBase
 
         if (user is null)
         {
-            return Unauthorized(new
-            {
-                message =
-                    "Invalid email or password."
-            });
+            return Unauthorized(
+                new
+                {
+                    message =
+                        "Invalid email or password."
+                });
         }
 
         bool passwordIsValid =
@@ -86,27 +87,37 @@ public sealed class AuthController : ControllerBase
 
         if (!passwordIsValid)
         {
-            return Unauthorized(new
-            {
-                message =
-                    "Invalid email or password."
-            });
+            return Unauthorized(
+                new
+                {
+                    message =
+                        "Invalid email or password."
+                });
         }
 
-        IList<string> roles =
+        IList<string> assignedRoles =
             await _userManager.GetRolesAsync(user);
 
-        if (roles.Count == 0)
+        List<string> supportedRoles =
+            assignedRoles
+                .Where(role =>
+                    AppRoles.All.Contains(
+                        role,
+                        StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+        if (supportedRoles.Count == 0)
         {
-            return Unauthorized(new
-            {
-                message =
-                    "No role has been assigned to this account."
-            });
+            return Unauthorized(
+                new
+                {
+                    message =
+                        "No supported role has been assigned to this account."
+                });
         }
 
-        string role =
-            roles[0];
+        string primaryRole =
+            GetPrimaryRole(supportedRoles);
 
         DateTime expiresAtUtc =
             DateTime.UtcNow.AddMinutes(
@@ -115,7 +126,7 @@ public sealed class AuthController : ControllerBase
         string token =
             CreateJwtToken(
                 user,
-                roles,
+                supportedRoles,
                 expiresAtUtc);
 
         var response =
@@ -134,10 +145,11 @@ public sealed class AuthController : ControllerBase
                     user.FullName,
 
                 Email =
-                    user.Email ?? normalizedEmail,
+                    user.Email ??
+                    normalizedEmail,
 
                 Role =
-                    role,
+                    primaryRole,
 
                 DepartmentId =
                     user.DepartmentId,
@@ -150,61 +162,72 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
+    [Authorize(Roles = AppRoles.SuperAdmin)]
     [ProducesResponseType(
         typeof(RegisterResponse),
         StatusCodes.Status201Created)]
     [ProducesResponseType(
         StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<RegisterResponse>>
-        Register(
-            [FromBody] RegisterRequest request)
+    [ProducesResponseType(
+        StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(
+        StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<RegisterResponse>> Register(
+        [FromBody] RegisterRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.FullName))
         {
-            return BadRequest(new
-            {
-                message =
-                    "Full name is required."
-            });
+            return BadRequest(
+                new
+                {
+                    message =
+                        "Full name is required."
+                });
         }
 
         if (string.IsNullOrWhiteSpace(request.Email))
         {
-            return BadRequest(new
-            {
-                message =
-                    "Email is required."
-            });
+            return BadRequest(
+                new
+                {
+                    message =
+                        "Email is required."
+                });
         }
 
         if (string.IsNullOrWhiteSpace(request.Password))
         {
-            return BadRequest(new
-            {
-                message =
-                    "Password is required."
-            });
+            return BadRequest(
+                new
+                {
+                    message =
+                        "Password is required."
+                });
         }
 
         if (string.IsNullOrWhiteSpace(request.Role))
         {
-            return BadRequest(new
-            {
-                message =
-                    "Role is required."
-            });
+            return BadRequest(
+                new
+                {
+                    message =
+                        "Role is required."
+                });
         }
 
         string role =
             NormalizeRole(request.Role);
 
-        if (!AppRoles.All.Contains(role))
+        if (!AppRoles.All.Contains(
+                role,
+                StringComparer.OrdinalIgnoreCase))
         {
-            return BadRequest(new
-            {
-                message =
-                    "The selected role is invalid."
-            });
+            return BadRequest(
+                new
+                {
+                    message =
+                        "The selected role is invalid."
+                });
         }
 
         string normalizedEmail =
@@ -218,11 +241,12 @@ public sealed class AuthController : ControllerBase
 
         if (existingUser is not null)
         {
-            return BadRequest(new
-            {
-                message =
-                    "A user with this email already exists."
-            });
+            return BadRequest(
+                new
+                {
+                    message =
+                        "A user with this email already exists."
+                });
         }
 
         string? validationError =
@@ -233,12 +257,17 @@ public sealed class AuthController : ControllerBase
 
         if (validationError is not null)
         {
-            return BadRequest(new
-            {
-                message =
-                    validationError
-            });
+            return BadRequest(
+                new
+                {
+                    message =
+                        validationError
+                });
         }
+
+        bool requiresEmployee =
+            role == AppRoles.Employee ||
+            role == AppRoles.TeamLead;
 
         var user =
             new ApplicationUser
@@ -261,7 +290,7 @@ public sealed class AuthController : ControllerBase
                         : request.DepartmentId,
 
                 EmployeeId =
-                    role == AppRoles.Employee
+                    requiresEmployee
                         ? request.EmployeeId
                         : null
             };
@@ -273,16 +302,17 @@ public sealed class AuthController : ControllerBase
 
         if (!createResult.Succeeded)
         {
-            return BadRequest(new
-            {
-                message =
-                    "Account creation failed.",
+            return BadRequest(
+                new
+                {
+                    message =
+                        "Account creation failed.",
 
-                errors =
-                    createResult.Errors.Select(
-                        error =>
-                            error.Description)
-            });
+                    errors =
+                        createResult.Errors.Select(
+                            error =>
+                                error.Description)
+                });
         }
 
         IdentityResult roleResult =
@@ -294,16 +324,46 @@ public sealed class AuthController : ControllerBase
         {
             await _userManager.DeleteAsync(user);
 
-            return BadRequest(new
-            {
-                message =
-                    "Account role could not be assigned.",
+            return BadRequest(
+                new
+                {
+                    message =
+                        "Account role could not be assigned.",
 
-                errors =
-                    roleResult.Errors.Select(
-                        error =>
-                            error.Description)
-            });
+                    errors =
+                        roleResult.Errors.Select(
+                            error =>
+                                error.Description)
+                });
+        }
+
+        /*
+         * A Team Lead is also an employee and therefore receives
+         * both TeamLead and Employee roles.
+         */
+        if (role == AppRoles.TeamLead)
+        {
+            IdentityResult employeeRoleResult =
+                await _userManager.AddToRoleAsync(
+                    user,
+                    AppRoles.Employee);
+
+            if (!employeeRoleResult.Succeeded)
+            {
+                await _userManager.DeleteAsync(user);
+
+                return BadRequest(
+                    new
+                    {
+                        message =
+                            "The Team Lead employee role could not be assigned.",
+
+                        errors =
+                            employeeRoleResult.Errors.Select(
+                                error =>
+                                    error.Description)
+                    });
+            }
         }
 
         var response =
@@ -333,6 +393,35 @@ public sealed class AuthController : ControllerBase
             response);
     }
 
+    private static string GetPrimaryRole(
+        IEnumerable<string> roles)
+    {
+        HashSet<string> assignedRoles =
+            roles.ToHashSet(
+                StringComparer.OrdinalIgnoreCase);
+
+        if (assignedRoles.Contains(
+                AppRoles.SuperAdmin))
+        {
+            return AppRoles.SuperAdmin;
+        }
+
+        if (assignedRoles.Contains(
+                AppRoles.TeamLead))
+        {
+            return AppRoles.TeamLead;
+        }
+
+        if (assignedRoles.Contains(
+                AppRoles.Employee))
+        {
+            return AppRoles.Employee;
+        }
+
+        throw new InvalidOperationException(
+            "The authenticated account has no supported role.");
+    }
+
     private string CreateJwtToken(
         ApplicationUser user,
         IEnumerable<string> roles,
@@ -347,7 +436,8 @@ public sealed class AuthController : ControllerBase
 
                 new(
                     JwtRegisteredClaimNames.Email,
-                    user.Email ?? string.Empty),
+                    user.Email ??
+                    string.Empty),
 
                 new(
                     JwtRegisteredClaimNames.Jti,
@@ -362,7 +452,8 @@ public sealed class AuthController : ControllerBase
                     user.FullName)
             };
 
-        foreach (string role in roles)
+        foreach (string role in roles.Distinct(
+                     StringComparer.OrdinalIgnoreCase))
         {
             claims.Add(
                 new Claim(
@@ -422,11 +513,10 @@ public sealed class AuthController : ControllerBase
             .WriteToken(token);
     }
 
-    private async Task<string?>
-        ValidateRoleDataAsync(
-            string role,
-            Guid? departmentId,
-            Guid? employeeId)
+    private async Task<string?> ValidateRoleDataAsync(
+        string role,
+        Guid? departmentId,
+        Guid? employeeId)
     {
         if (role == AppRoles.SuperAdmin)
         {
@@ -451,7 +541,11 @@ public sealed class AuthController : ControllerBase
                 "The selected department does not exist.";
         }
 
-        if (role != AppRoles.Employee)
+        bool requiresEmployee =
+            role == AppRoles.Employee ||
+            role == AppRoles.TeamLead;
+
+        if (!requiresEmployee)
         {
             return null;
         }
@@ -510,17 +604,11 @@ public sealed class AuthController : ControllerBase
             "super admin" =>
                 AppRoles.SuperAdmin,
 
-            "departmentadmin" =>
-                AppRoles.DepartmentAdmin,
-
-            "department admin" =>
-                AppRoles.DepartmentAdmin,
-
-            "admin" =>
-                AppRoles.DepartmentAdmin,
+            "teamlead" =>
+                AppRoles.TeamLead,
 
             "team lead" =>
-                AppRoles.DepartmentAdmin,
+                AppRoles.TeamLead,
 
             "employee" =>
                 AppRoles.Employee,

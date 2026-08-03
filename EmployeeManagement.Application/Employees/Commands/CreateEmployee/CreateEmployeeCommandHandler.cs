@@ -1,4 +1,5 @@
 using EmployeeManagement.Application.Abstractions;
+using EmployeeManagement.Application.Common.Constants;
 using EmployeeManagement.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -8,29 +9,58 @@ namespace EmployeeManagement.Application.Employees.Commands.CreateEmployee;
 public sealed class CreateEmployeeCommandHandler
     : IRequestHandler<CreateEmployee, Guid>
 {
-    private readonly IApplicationDbContext _dbContext;
+    private readonly IApplicationDbContext
+        _dbContext;
+
+    private readonly ICurrentUserService
+        _currentUserService;
 
     public CreateEmployeeCommandHandler(
-        IApplicationDbContext dbContext)
+        IApplicationDbContext dbContext,
+        ICurrentUserService currentUserService)
     {
-        _dbContext = dbContext;
+        _dbContext =
+            dbContext;
+
+        _currentUserService =
+            currentUserService;
     }
 
     public async Task<Guid> Handle(
         CreateEmployee request,
         CancellationToken cancellationToken)
     {
-        string normalizedEmail = request.Email
-            .Trim()
-            .ToLowerInvariant();
+        if (!_currentUserService.IsAuthenticated)
+        {
+            throw new UnauthorizedAccessException(
+                "The current user is not authenticated.");
+        }
 
-        bool exists = await _dbContext.Employees
-            .AsNoTracking()
-            .AnyAsync(
-                employee => employee.Email == normalizedEmail,
-                cancellationToken);
+        bool isSuperAdmin =
+            _currentUserService.IsInRole(
+                AppRoles.SuperAdmin);
 
-        if (exists)
+        if (!isSuperAdmin)
+        {
+            throw new UnauthorizedAccessException(
+                "You are not authorized to create employees.");
+        }
+
+        string normalizedEmail =
+            request.Email
+                .Trim()
+                .ToLowerInvariant();
+
+        bool employeeExists =
+            await _dbContext.Employees
+                .AsNoTracking()
+                .AnyAsync(
+                    employee =>
+                        employee.Email ==
+                        normalizedEmail,
+                    cancellationToken);
+
+        if (employeeExists)
         {
             throw new InvalidOperationException(
                 "Employee with this email already exists.");

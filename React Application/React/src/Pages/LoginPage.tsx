@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { SyntheticEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+
 import {
   Alert,
   Box,
@@ -12,50 +13,39 @@ import {
   Typography,
 } from "@mui/material";
 
-interface LoginResponse {
-  token: string;
-  expiresAtUtc: string;
-  userId: string;
-  fullName: string;
-  email: string;
-  role: string;
-  departmentId: string | null;
-  employeeId: string | null;
-}
-
-interface ApiErrorResponse {
-  message?: string;
-  errors?: string[];
-}
-
-interface StoredUser {
-  userId: string;
-  fullName: string;
-  email: string;
-  role: string;
-  departmentId: string | null;
-  employeeId: string | null;
-  expiresAtUtc: string;
-}
+import type {
+  ApiErrorResponse,
+  LoginResponse,
+  StoredUser,
+  UserRole,
+} from "../Types/auth";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
-  "http://localhost:5000";
+  "http://localhost:5000/api";
 
-export default function LoginPage() {
+const TOKEN_KEY = "authToken";
+const USER_KEY = "authUser";
+
+export default function LoginPage(): React.ReactElement {
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [email, setEmail] =
+    useState<string>("");
+
+  const [password, setPassword] =
+    useState<string>("");
+
+  const [error, setError] =
+    useState<string>("");
+
   const [isSubmitting, setIsSubmitting] =
-    useState(false);
+    useState<boolean>(false);
 
   const handleSubmit = async (
     event: SyntheticEvent<HTMLFormElement>,
-  ) => {
+  ): Promise<void> => {
     event.preventDefault();
-
     setError("");
 
     const normalizedEmail =
@@ -75,7 +65,7 @@ export default function LoginPage() {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/auth/login`,
+        `${API_BASE_URL}/auth/login`,
         {
           method: "POST",
           headers: {
@@ -92,16 +82,27 @@ export default function LoginPage() {
         await readResponseBody(response);
 
       if (!response.ok) {
+        const fallbackMessage =
+          response.status === 401
+            ? "The email address or password is incorrect."
+            : `Login failed with status ${response.status}.`;
+
         throw new Error(
           getErrorMessage(
             responseBody,
-            "Login failed. Check your email and password.",
+            fallbackMessage,
           ),
         );
       }
 
-      const loginResponse =
-        responseBody as LoginResponse;
+      if (!isLoginResponse(responseBody)) {
+        throw new Error(
+          "The API returned an invalid login response.",
+        );
+      }
+
+      const loginResponse: LoginResponse =
+        responseBody;
 
       if (!loginResponse.token) {
         throw new Error(
@@ -109,11 +110,22 @@ export default function LoginPage() {
         );
       }
 
+      const parsedRole =
+        parseUserRole(loginResponse.role);
+
+      if (!parsedRole) {
+        throw new Error(
+          `The API returned an unsupported account role: ${
+            String(loginResponse.role)
+          }.`,
+        );
+      }
+
       const storedUser: StoredUser = {
         userId: loginResponse.userId,
         fullName: loginResponse.fullName,
         email: loginResponse.email,
-        role: loginResponse.role,
+        role: parsedRole,
         departmentId:
           loginResponse.departmentId,
         employeeId:
@@ -123,19 +135,24 @@ export default function LoginPage() {
       };
 
       localStorage.setItem(
-        "authToken",
+        TOKEN_KEY,
         loginResponse.token,
       );
 
       localStorage.setItem(
-        "authUser",
+        USER_KEY,
         JSON.stringify(storedUser),
       );
 
-      navigate("/dashboard", {
-        replace: true,
-      });
+      navigate(
+        getDashboardPath(parsedRole),
+        {
+          replace: true,
+        },
+      );
     } catch (caughtError: unknown) {
+      clearAuthentication();
+
       if (caughtError instanceof TypeError) {
         setError(
           `Could not connect to the API at ${API_BASE_URL}. ` +
@@ -227,6 +244,7 @@ export default function LoginPage() {
               value={email}
               onChange={(event) => {
                 setEmail(event.target.value);
+                setError("");
               }}
               autoComplete="email"
               autoFocus
@@ -246,6 +264,7 @@ export default function LoginPage() {
               value={password}
               onChange={(event) => {
                 setPassword(event.target.value);
+                setError("");
               }}
               autoComplete="current-password"
               required
@@ -267,63 +286,109 @@ export default function LoginPage() {
               }}
             >
               {isSubmitting ? (
-                <CircularProgress
-                  size={24}
-                  color="inherit"
-                />
+                <>
+                  <CircularProgress
+                    size={22}
+                    color="inherit"
+                    sx={{
+                      mr: 1,
+                    }}
+                  />
+
+                  Signing in...
+                </>
               ) : (
                 "Sign in"
               )}
             </Button>
           </Box>
-
-          <Typography
-            align="center"
-            color="text.secondary"
-            sx={{
-              mt: 3,
-            }}
-          >
-            Do not have an account?{" "}
-            <Link
-              to="/signup"
-              style={{
-                fontWeight: 600,
-                textDecoration: "none",
-              }}
-            >
-              Create an account
-            </Link>
-          </Typography>
         </Paper>
       </Box>
     </Container>
   );
 }
 
+function getDashboardPath(
+  role: UserRole,
+): string {
+  switch (role) {
+    case "Employee":
+      return "/employee/dashboard";
+
+    case "TeamLead":
+      return "/team-lead/dashboard";
+
+    case "SuperAdmin":
+      return "/super-admin/dashboard";
+  }
+}
+
+function parseUserRole(
+  role: unknown,
+): UserRole | null {
+  if (typeof role !== "string") {
+    return null;
+  }
+
+  const normalizedRole = role
+    .trim()
+    .replace(/[\s_-]+/g, "")
+    .toLowerCase();
+
+  switch (normalizedRole) {
+    case "employee":
+      return "Employee";
+
+    case "teamlead":
+      return "TeamLead";
+
+    case "superadmin":
+      return "SuperAdmin";
+
+    default:
+      return null;
+  }
+}
+
+function isLoginResponse(
+  value: unknown,
+): value is LoginResponse {
+  if (
+    typeof value !== "object" ||
+    value === null
+  ) {
+    return false;
+  }
+
+  const response =
+    value as Partial<LoginResponse>;
+
+  return (
+    typeof response.token === "string" &&
+    typeof response.userId === "string" &&
+    typeof response.fullName === "string" &&
+    typeof response.email === "string" &&
+    typeof response.role === "string"
+  );
+}
+
 async function readResponseBody(
   response: Response,
 ): Promise<unknown> {
-  const contentType =
-    response.headers.get("content-type");
+  const responseText =
+    await response.text();
 
-  if (
-    contentType?.includes(
-      "application/json",
-    )
-  ) {
-    return response.json();
-  }
-
-  const text = await response.text();
-
-  if (!text) {
+  if (!responseText) {
     return {};
   }
 
-  return {
-    message: text,
-  };
+  try {
+    return JSON.parse(responseText) as unknown;
+  } catch {
+    return {
+      message: responseText,
+    };
+  }
 }
 
 function getErrorMessage(
@@ -338,13 +403,22 @@ function getErrorMessage(
   }
 
   const apiError =
-    responseBody as ApiErrorResponse;
+    responseBody as ApiErrorResponse & {
+      title?: string;
+    };
 
   if (
     typeof apiError.message === "string" &&
     apiError.message.trim()
   ) {
     return apiError.message;
+  }
+
+  if (
+    typeof apiError.title === "string" &&
+    apiError.title.trim()
+  ) {
+    return apiError.title;
   }
 
   if (
@@ -355,4 +429,9 @@ function getErrorMessage(
   }
 
   return fallbackMessage;
+}
+
+function clearAuthentication(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
 }

@@ -4,14 +4,14 @@ public static class AppRoles
 {
     public const string SuperAdmin = "SuperAdmin";
 
-    public const string DepartmentAdmin = "DepartmentAdmin";
+    public const string TeamLead = "TeamLead";
 
     public const string Employee = "Employee";
 
     public static readonly IReadOnlyCollection<string> All =
     [
         SuperAdmin,
-        DepartmentAdmin,
+        TeamLead,
         Employee
     ];
 }

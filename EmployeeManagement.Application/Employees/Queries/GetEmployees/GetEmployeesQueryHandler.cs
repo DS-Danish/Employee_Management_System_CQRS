@@ -1,5 +1,6 @@
 using EmployeeManagement.Application.Abstractions;
 using EmployeeManagement.Application.Common;
+using EmployeeManagement.Application.Common.Constants;
 using EmployeeManagement.Application.Employees.DTOs;
 using EmployeeManagement.Domain.Entities;
 using MediatR;
@@ -8,58 +9,134 @@ using Microsoft.EntityFrameworkCore;
 namespace EmployeeManagement.Application.Employees.Queries.GetEmployees;
 
 public sealed class GetEmployeesQueryHandler
-    : IRequestHandler<GetEmployeesQuery, PagedResult<EmployeeListItemDto>>
+    : IRequestHandler<
+        GetEmployeesQuery,
+        PagedResult<EmployeeListItemDto>>
 {
-    private readonly IApplicationDbContext _dbContext;
+    private readonly IApplicationDbContext
+        _dbContext;
+
+    private readonly ICurrentUserService
+        _currentUserService;
 
     public GetEmployeesQueryHandler(
-        IApplicationDbContext dbContext)
+        IApplicationDbContext dbContext,
+        ICurrentUserService currentUserService)
     {
-        _dbContext = dbContext;
+        _dbContext =
+            dbContext;
+
+        _currentUserService =
+            currentUserService;
     }
 
-    public async Task<PagedResult<EmployeeListItemDto>> Handle(
+    public async Task<
+        PagedResult<EmployeeListItemDto>> Handle(
         GetEmployeesQuery request,
         CancellationToken cancellationToken)
     {
-        IQueryable<Employee> query = _dbContext.Employees
-            .AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(request.Search))
+        if (!_currentUserService.IsAuthenticated)
         {
-            string search = request.Search.Trim();
-
-            query = query.Where(x =>
-                x.FirstName.Contains(search) ||
-                x.LastName.Contains(search) ||
-                x.Email.Contains(search));
+            throw new UnauthorizedAccessException(
+                "The current user is not authenticated.");
         }
 
-        int totalCount = await query.CountAsync(
-            cancellationToken);
+        IQueryable<Employee> query =
+            _dbContext.Employees
+                .AsNoTracking();
 
-        EmployeeListItemDto[] employees = await query
-            .OrderBy(x => x.FirstName)
-            .ThenBy(x => x.LastName)
-            .Skip(
-                (request.PageNumber - 1) *
-                request.PageSize)
-            .Take(request.PageSize)
-            .Select(x => new EmployeeListItemDto(
-                x.Id,
-                $"{x.FirstName} {x.LastName}",
-                x.Email,
-                x.Address.City,
-                x.DepartmentId,
-                x.Department != null
-                    ? x.Department.Name
-                    : null))
-            .ToArrayAsync(cancellationToken);
+        bool isSuperAdmin =
+            _currentUserService.IsInRole(
+                AppRoles.SuperAdmin);
+
+        bool isTeamLead =
+            _currentUserService.IsInRole(
+                AppRoles.TeamLead);
+
+        if (isTeamLead &&
+            !isSuperAdmin)
+        {
+            Guid teamLeadEmployeeId =
+                _currentUserService.EmployeeId
+                ?? throw new UnauthorizedAccessException(
+                    "The Team Lead account is not linked " +
+                    "to an employee profile.");
+
+            query =
+                query.Where(
+                    employee =>
+                        employee.TeamLeadId ==
+                        teamLeadEmployeeId);
+        }
+        else if (!isSuperAdmin)
+        {
+            throw new UnauthorizedAccessException(
+                "You are not authorized to view employees.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(
+                request.Search))
+        {
+            string search =
+                request.Search.Trim();
+
+            query =
+                query.Where(
+                    employee =>
+                        employee.FirstName.Contains(
+                            search) ||
+                        employee.LastName.Contains(
+                            search) ||
+                        employee.Email.Contains(
+                            search));
+        }
+
+        int pageNumber =
+            request.PageNumber < 1
+                ? 1
+                : request.PageNumber;
+
+        int pageSize =
+            request.PageSize < 1
+                ? 10
+                : request.PageSize;
+
+        int totalCount =
+            await query.CountAsync(
+                cancellationToken);
+
+        EmployeeListItemDto[] employees =
+            await query
+                .OrderBy(
+                    employee =>
+                        employee.FirstName)
+                .ThenBy(
+                    employee =>
+                        employee.LastName)
+                .Skip(
+                    (pageNumber - 1) *
+                    pageSize)
+                .Take(
+                    pageSize)
+                .Select(
+                    employee =>
+                        new EmployeeListItemDto(
+                            employee.Id,
+                            $"{employee.FirstName} " +
+                            $"{employee.LastName}",
+                            employee.Email,
+                            employee.Address.City,
+                            employee.DepartmentId,
+                            employee.Department != null
+                                ? employee.Department.Name
+                                : null))
+                .ToArrayAsync(
+                    cancellationToken);
 
         return new PagedResult<EmployeeListItemDto>(
             employees,
-            request.PageNumber,
-            request.PageSize,
+            pageNumber,
+            pageSize,
             totalCount);
     }
 }

@@ -106,3 +106,46 @@ export function deleteEmployee(
     },
   );
 }
+
+export interface MyEmployeeProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+
+  departmentId?: string | null;
+  departmentName?: string | null;
+
+  street?: string | null;
+  city?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
+}
+
+export interface UpdateMyEmployeeProfileRequest {
+  firstName: string;
+  lastName: string;
+  street: string;
+  city: string;
+  country: string;
+  postalCode: string;
+}
+
+export async function getMyEmployeeProfile():
+  Promise<MyEmployeeProfile> {
+  return apiRequest<MyEmployeeProfile>(
+    "/employees/me",
+  );
+}
+
+export async function updateMyEmployeeProfile(
+  request: UpdateMyEmployeeProfileRequest,
+): Promise<void> {
+  await apiRequest<void>(
+    "/employees/me",
+    {
+      method: "PUT",
+      body: JSON.stringify(request),
+    },
+  );
+}

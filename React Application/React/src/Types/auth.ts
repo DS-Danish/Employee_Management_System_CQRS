@@ -1,6 +1,6 @@
 export type UserRole =
   | "SuperAdmin"
-  | "DepartmentAdmin"
+  | "TeamLead"
   | "Employee";
 
 export interface RegisterRequest {
@@ -28,12 +28,23 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string;
+  expiresAtUtc: string;
   userId: string;
   fullName: string;
   email: string;
   role: UserRole;
   departmentId: string | null;
   employeeId: string | null;
+}
+
+export interface StoredUser {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  departmentId: string | null;
+  employeeId: string | null;
+  expiresAtUtc: string;
 }
 
 export interface ApiErrorResponse {

@@ -28,19 +28,60 @@ export async function apiRequest<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
-  const response: Response = await fetch(`${apiBaseUrl}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
+  const token: string | null =
+    localStorage.getItem("authToken");
+
+  const headers = new Headers(options?.headers);
+
+  if (!headers.has("Content-Type")) {
+    headers.set(
+      "Content-Type",
+      "application/json",
+    );
+  }
+
+  if (token) {
+    headers.set(
+      "Authorization",
+      `Bearer ${token}`,
+    );
+  }
+
+  const response: Response = await fetch(
+    `${apiBaseUrl}${path}`,
+    {
+      ...options,
+      headers,
     },
-  });
+  );
 
   if (!response.ok) {
-    const responseBody: string = await response.text();
+    const responseBody: string =
+      await response.text();
+
+    let message =
+      `Request failed with status ${response.status}.`;
+
+    if (responseBody) {
+      try {
+        const parsedError = JSON.parse(
+          responseBody,
+        ) as {
+          message?: string;
+          title?: string;
+        };
+
+        message =
+          parsedError.message ??
+          parsedError.title ??
+          message;
+      } catch {
+        message = responseBody;
+      }
+    }
 
     throw new ApiError(
-      responseBody || `Request failed with status ${response.status}.`,
+      message,
       response.status,
       responseBody,
     );
@@ -50,7 +91,8 @@ export async function apiRequest<T>(
     return undefined as T;
   }
 
-  const responseText: string = await response.text();
+  const responseText: string =
+    await response.text();
 
   if (!responseText) {
     return undefined as T;

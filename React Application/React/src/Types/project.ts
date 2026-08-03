@@ -1,9 +1,15 @@
+export type ProjectStatus =
+  | "Active"
+  | "Completed";
+
 export interface Project {
   id: string;
   name: string;
   description?: string;
   startDate?: string;
   endDate?: string | null;
+  createdAtUtc?: string;
+  status: ProjectStatus;
 }
 
 export interface EmployeeProject {
