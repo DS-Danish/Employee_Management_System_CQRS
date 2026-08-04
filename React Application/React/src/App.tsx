@@ -6,30 +6,51 @@ import {
 
 import ProtectedRoute from "./Components/ProtectedRoute";
 
+import {
+  AppPermissions,
+} from "./Constants/permissions";
+
+import CreateUserPage from "./Pages/CreateUserPage";
 import DashboardPage from "./Pages/DashboardPage";
 import DepartmentsPage from "./Pages/DepartmentsPage";
-import { EmployeesPage } from "./Pages/EmployeesPage";
+import {
+  EmployeesPage,
+} from "./Pages/EmployeesPage";
 import EmployeeProfilePage from "./Pages/EmployeeProfilePage";
 import LoginPage from "./Pages/LoginPage";
-import { ProjectsPage } from "./Pages/ProjectsPage";
-import CreateUserPage from "./Pages/CreateUserPage";
+import PermissionManagementPage from "./Pages/PermissionManagementPage";
+import {
+  ProjectsPage,
+} from "./Pages/ProjectsPage";
 import SuperAdminDashboardPage from "./Pages/SuperAdminDashboardPage";
-import { SuperAdminLayout } from "./Pages/SuperAdminLayout";
+import {
+  SuperAdminLayout,
+} from "./Pages/SuperAdminLayout";
 import TeamLeadDashboardPage from "./Pages/TeamLeadDashboardPage";
-import { TeamLeadLayout } from "./Pages/TeamLeadLayout";
+import {
+  TeamLeadLayout,
+} from "./Pages/TeamLeadLayout";
+
 
 import type {
   StoredUser,
   UserRole,
 } from "./Types/auth";
 
-export default function App(): React.ReactElement {
+export default function App():
+  React.ReactElement {
   return (
     <Routes>
       <Route
         path="/login"
-        element={<LoginPage />}
+        element={
+          <LoginPage />
+        }
       />
+
+      {/* =========================
+          EMPLOYEE
+          ========================= */}
 
       <Route
         element={
@@ -47,6 +68,73 @@ export default function App(): React.ReactElement {
           }
         />
       </Route>
+
+      <Route
+        element={
+          <ProtectedRoute
+            allowedRoles={[
+              "Employee",
+            ]}
+            requiredPermissions={[
+              AppPermissions
+                .ViewEmployees,
+            ]}
+          />
+        }
+      >
+        <Route
+          path="/employee/employees"
+          element={
+            <EmployeesPage />
+          }
+        />
+      </Route>
+
+      <Route
+        element={
+          <ProtectedRoute
+            allowedRoles={[
+              "Employee",
+            ]}
+            requiredPermissions={[
+              AppPermissions
+                .ViewDepartments,
+            ]}
+          />
+        }
+      >
+        <Route
+          path="/employee/departments"
+          element={
+            <DepartmentsPage />
+          }
+        />
+      </Route>
+
+      <Route
+        element={
+          <ProtectedRoute
+            allowedRoles={[
+              "Employee",
+            ]}
+            requiredPermissions={[
+              AppPermissions
+                .ViewProjects,
+            ]}
+          />
+        }
+      >
+        <Route
+          path="/employee/projects"
+          element={
+            <ProjectsPage />
+          }
+        />
+      </Route>
+
+      {/* =========================
+          TEAM LEAD / ADMIN
+          ========================= */}
 
       <Route
         element={
@@ -81,16 +169,73 @@ export default function App(): React.ReactElement {
           />
 
           <Route
-            path="employees"
             element={
-              <EmployeesPage />
+              <ProtectedRoute
+                requiredPermissions={[
+                  AppPermissions
+                    .ViewEmployees,
+                ]}
+              />
             }
-          />
+          >
+            <Route
+              path="employees"
+              element={
+                <EmployeesPage />
+              }
+            />
+          </Route>
 
           <Route
-            path="projects"
             element={
-              <ProjectsPage />
+              <ProtectedRoute
+                requiredPermissions={[
+                  AppPermissions
+                    .ViewDepartments,
+                ]}
+              />
+            }
+          >
+            <Route
+              path="departments"
+              element={
+                <DepartmentsPage />
+              }
+            />
+          </Route>
+
+          <Route
+            element={
+              <ProtectedRoute
+                requiredPermissions={[
+                  AppPermissions
+                    .ViewProjects,
+                ]}
+              />
+            }
+          >
+            <Route
+              path="projects"
+              element={
+                <ProjectsPage />
+              }
+            />
+          </Route>
+
+          {/*
+           * Permission Management is a
+           * TeamLead role responsibility.
+           *
+           * It intentionally does not
+           * require an AppPermission.
+           *
+           * Backend controls that TeamLead
+           * may modify Employees only.
+           */}
+          <Route
+            path="permissions"
+            element={
+              <PermissionManagementPage />
             }
           />
 
@@ -102,6 +247,10 @@ export default function App(): React.ReactElement {
           />
         </Route>
       </Route>
+
+      {/* =========================
+          SUPER ADMIN
+          ========================= */}
 
       <Route
         element={
@@ -162,6 +311,13 @@ export default function App(): React.ReactElement {
               <CreateUserPage />
             }
           />
+
+          <Route
+            path="permissions"
+            element={
+              <PermissionManagementPage />
+            }
+          />
         </Route>
       </Route>
 
@@ -191,14 +347,12 @@ export default function App(): React.ReactElement {
 
 function RootRedirect():
   React.ReactElement {
-  const token: string | null =
+  const token =
     localStorage.getItem(
       "authToken",
     );
 
-  const storedUser:
-    | string
-    | null =
+  const storedUser =
     localStorage.getItem(
       "authUser",
     );
@@ -206,7 +360,8 @@ function RootRedirect():
   return (
     <Navigate
       to={
-        token && storedUser
+        token &&
+        storedUser
           ? "/dashboard"
           : "/login"
       }
@@ -217,14 +372,12 @@ function RootRedirect():
 
 function DashboardRedirect():
   React.ReactElement {
-  const token: string | null =
+  const token =
     localStorage.getItem(
       "authToken",
     );
 
-  const storedUserJson:
-    | string
-    | null =
+  const storedUserJson =
     localStorage.getItem(
       "authUser",
     );
@@ -319,7 +472,7 @@ function isTokenExpired(
     return false;
   }
 
-  const expirationTime: number =
+  const expirationTime =
     new Date(
       expiresAtUtc,
     ).getTime();

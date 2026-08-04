@@ -1,8 +1,20 @@
-namespace EmployeeManagement.API.Contracts.Auth;
+namespace EmployeeManagement.API.Contracts;
 
-public sealed record RegisterResponse(
-    string UserId,
-    string Email,
-    string Role,
-    Guid? EmployeeId,
-    Guid? DepartmentId);
+public sealed class RegisterResponse
+{
+    public string UserId { get; set; } =
+        string.Empty;
+
+    public string FullName { get; set; } =
+        string.Empty;
+
+    public string Email { get; set; } =
+        string.Empty;
+
+    public string Role { get; set; } =
+        string.Empty;
+
+    public Guid? DepartmentId { get; set; }
+
+    public Guid? EmployeeId { get; set; }
+}

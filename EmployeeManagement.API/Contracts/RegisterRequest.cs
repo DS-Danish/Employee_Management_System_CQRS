@@ -1,4 +1,4 @@
-namespace EmployeeManagement.API.Contracts.Auth;
+namespace EmployeeManagement.API.Contracts;
 
 public sealed record RegisterRequest(
     string FullName,

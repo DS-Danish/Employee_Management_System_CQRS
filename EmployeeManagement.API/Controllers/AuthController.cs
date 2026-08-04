@@ -1,7 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using EmployeeManagement.Application.Authentication;
+using EmployeeManagement.API.Contracts;
+using EmployeeManagement.Application.Common.Constants;
 using EmployeeManagement.Domain.Entities;
 using EmployeeManagement.Infrastructure.Identity;
 using EmployeeManagement.Infrastructure.Persistence;
@@ -11,13 +12,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using EmployeeManagement.Application.Common.Constants;
 
 namespace EmployeeManagement.API.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController : ControllerBase
+public sealed class AuthController
+    : ControllerBase
 {
     private readonly UserManager<ApplicationUser>
         _userManager;
@@ -33,9 +34,14 @@ public sealed class AuthController : ControllerBase
         ApplicationDbContext databaseContext,
         IOptions<JwtSettings> jwtOptions)
     {
-        _userManager = userManager;
-        _databaseContext = databaseContext;
-        _jwtSettings = jwtOptions.Value;
+        _userManager =
+            userManager;
+
+        _databaseContext =
+            databaseContext;
+
+        _jwtSettings =
+            jwtOptions.Value;
     }
 
     [HttpPost("login")]
@@ -47,11 +53,16 @@ public sealed class AuthController : ControllerBase
         StatusCodes.Status400BadRequest)]
     [ProducesResponseType(
         StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<LoginResponse>> Login(
-        [FromBody] LoginRequest request)
+    public async Task<ActionResult<LoginResponse>>
+        Login(
+            [FromBody]
+            LoginRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Email) ||
-            string.IsNullOrWhiteSpace(request.Password))
+        if (
+            string.IsNullOrWhiteSpace(
+                request.Email) ||
+            string.IsNullOrWhiteSpace(
+                request.Password))
         {
             return BadRequest(
                 new
@@ -67,8 +78,9 @@ public sealed class AuthController : ControllerBase
                 .ToLowerInvariant();
 
         ApplicationUser? user =
-            await _userManager.FindByEmailAsync(
-                normalizedEmail);
+            await _userManager
+                .FindByEmailAsync(
+                    normalizedEmail);
 
         if (user is null)
         {
@@ -81,9 +93,10 @@ public sealed class AuthController : ControllerBase
         }
 
         bool passwordIsValid =
-            await _userManager.CheckPasswordAsync(
-                user,
-                request.Password);
+            await _userManager
+                .CheckPasswordAsync(
+                    user,
+                    request.Password);
 
         if (!passwordIsValid)
         {
@@ -96,14 +109,18 @@ public sealed class AuthController : ControllerBase
         }
 
         IList<string> assignedRoles =
-            await _userManager.GetRolesAsync(user);
+            await _userManager
+                .GetRolesAsync(
+                    user);
 
         List<string> supportedRoles =
             assignedRoles
-                .Where(role =>
-                    AppRoles.All.Contains(
-                        role,
-                        StringComparer.OrdinalIgnoreCase))
+                .Where(
+                    role =>
+                        AppRoles.All.Contains(
+                            role,
+                            StringComparer
+                                .OrdinalIgnoreCase))
                 .ToList();
 
         if (supportedRoles.Count == 0)
@@ -117,16 +134,42 @@ public sealed class AuthController : ControllerBase
         }
 
         string primaryRole =
-            GetPrimaryRole(supportedRoles);
+            GetPrimaryRole(
+                supportedRoles);
+
+        /*
+         * Load all permissions explicitly
+         * assigned to this user.
+         */
+        List<string> permissions =
+            await _databaseContext
+                .UserPermissions
+                .AsNoTracking()
+                .Where(
+                    userPermission =>
+                        userPermission.UserId ==
+                        user.Id)
+                .Select(
+                    userPermission =>
+                        userPermission
+                            .Permission
+                            .Code)
+                .Distinct()
+                .OrderBy(
+                    permission =>
+                        permission)
+                .ToListAsync();
 
         DateTime expiresAtUtc =
             DateTime.UtcNow.AddMinutes(
-                _jwtSettings.ExpirationMinutes);
+                _jwtSettings
+                    .ExpirationMinutes);
 
         string token =
             CreateJwtToken(
                 user,
                 supportedRoles,
+                permissions,
                 expiresAtUtc);
 
         var response =
@@ -155,55 +198,73 @@ public sealed class AuthController : ControllerBase
                     user.DepartmentId,
 
                 EmployeeId =
-                    user.EmployeeId
+                    user.EmployeeId,
+
+                Permissions =
+                    permissions
             };
 
-        return Ok(response);
+        return Ok(
+            response);
     }
 
     [HttpGet("available-employees")]
-    [Authorize(Roles = AppRoles.SuperAdmin)]
+    [Authorize(
+        Roles = AppRoles.SuperAdmin)]
     public async Task<ActionResult<
         IReadOnlyList<AvailableEmployeeResponse>>>
         GetAvailableEmployees(
             CancellationToken cancellationToken)
     {
         List<Guid> linkedEmployeeIds =
-            await _userManager.Users
-                .Where(user =>
-                    user.EmployeeId.HasValue)
-                .Select(user =>
-                    user.EmployeeId!.Value)
+            await _userManager
+                .Users
+                .Where(
+                    user =>
+                        user.EmployeeId
+                            .HasValue)
+                .Select(
+                    user =>
+                        user.EmployeeId!
+                            .Value)
                 .ToListAsync(
                     cancellationToken);
 
         IReadOnlyList<AvailableEmployeeResponse>
             employees =
-            await _databaseContext.Employees
-                .AsNoTracking()
-                .Where(employee =>
-                    !linkedEmployeeIds.Contains(
-                        employee.Id))
-                .OrderBy(employee =>
-                    employee.FirstName)
-                .ThenBy(employee =>
-                    employee.LastName)
-                .Select(employee =>
-                    new AvailableEmployeeResponse(
-                        employee.Id,
-                        employee.FirstName +
-                        " " +
-                        employee.LastName,
-                        employee.Email,
-                        employee.DepartmentId))
-                .ToListAsync(
-                    cancellationToken);
+                await _databaseContext
+                    .Employees
+                    .AsNoTracking()
+                    .Where(
+                        employee =>
+                            !linkedEmployeeIds
+                                .Contains(
+                                    employee.Id))
+                    .OrderBy(
+                        employee =>
+                            employee.FirstName)
+                    .ThenBy(
+                        employee =>
+                            employee.LastName)
+                    .Select(
+                        employee =>
+                            new AvailableEmployeeResponse(
+                                employee.Id,
+                                employee.FirstName +
+                                " " +
+                                employee.LastName,
+                                employee.Email,
+                                employee.DepartmentId))
+                    .ToListAsync(
+                        cancellationToken);
 
-        return Ok(employees);
+        return Ok(
+            employees);
     }
 
     [HttpPost("register")]
-    [Authorize(Roles = AppRoles.SuperAdmin)]
+    [Authorize(
+        Roles = AppRoles.SuperAdmin)]
     [ProducesResponseType(
         typeof(RegisterResponse),
         StatusCodes.Status201Created)]
@@ -213,10 +274,14 @@ public sealed class AuthController : ControllerBase
         StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(
         StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<RegisterResponse>> Register(
-        [FromBody] RegisterRequest request)
+    public async Task<ActionResult<RegisterResponse>>
+        Register(
+            [FromBody]
+            RegisterRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.FullName))
+        if (
+            string.IsNullOrWhiteSpace(
+                request.FullName))
         {
             return BadRequest(
                 new
@@ -226,7 +291,9 @@ public sealed class AuthController : ControllerBase
                 });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Email))
+        if (
+            string.IsNullOrWhiteSpace(
+                request.Email))
         {
             return BadRequest(
                 new
@@ -236,7 +303,9 @@ public sealed class AuthController : ControllerBase
                 });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Password))
+        if (
+            string.IsNullOrWhiteSpace(
+                request.Password))
         {
             return BadRequest(
                 new
@@ -246,7 +315,9 @@ public sealed class AuthController : ControllerBase
                 });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Role))
+        if (
+            string.IsNullOrWhiteSpace(
+                request.Role))
         {
             return BadRequest(
                 new
@@ -257,11 +328,14 @@ public sealed class AuthController : ControllerBase
         }
 
         string role =
-            NormalizeRole(request.Role);
+            NormalizeRole(
+                request.Role);
 
-        if (!AppRoles.All.Contains(
+        if (
+            !AppRoles.All.Contains(
                 role,
-                StringComparer.OrdinalIgnoreCase))
+                StringComparer
+                    .OrdinalIgnoreCase))
         {
             return BadRequest(
                 new
@@ -271,14 +345,32 @@ public sealed class AuthController : ControllerBase
                 });
         }
 
+        /*
+         * Only these roles should be
+         * creatable through this endpoint.
+         */
+        if (
+            role != AppRoles.SuperAdmin &&
+            role != AppRoles.TeamLead &&
+            role != AppRoles.Employee)
+        {
+            return BadRequest(
+                new
+                {
+                    message =
+                        "The selected role is not supported."
+                });
+        }
+
         string normalizedEmail =
             request.Email
                 .Trim()
                 .ToLowerInvariant();
 
         ApplicationUser? existingUser =
-            await _userManager.FindByEmailAsync(
-                normalizedEmail);
+            await _userManager
+                .FindByEmailAsync(
+                    normalizedEmail);
 
         if (existingUser is not null)
         {
@@ -314,7 +406,8 @@ public sealed class AuthController : ControllerBase
             new ApplicationUser
             {
                 FullName =
-                    request.FullName.Trim(),
+                    request.FullName
+                        .Trim(),
 
                 Email =
                     normalizedEmail,
@@ -326,7 +419,8 @@ public sealed class AuthController : ControllerBase
                     true,
 
                 DepartmentId =
-                    role == AppRoles.SuperAdmin
+                    role ==
+                    AppRoles.SuperAdmin
                         ? null
                         : request.DepartmentId,
 
@@ -337,9 +431,10 @@ public sealed class AuthController : ControllerBase
             };
 
         IdentityResult createResult =
-            await _userManager.CreateAsync(
-                user,
-                request.Password);
+            await _userManager
+                .CreateAsync(
+                    user,
+                    request.Password);
 
         if (!createResult.Succeeded)
         {
@@ -350,20 +445,25 @@ public sealed class AuthController : ControllerBase
                         "Account creation failed.",
 
                     errors =
-                        createResult.Errors.Select(
-                            error =>
-                                error.Description)
+                        createResult
+                            .Errors
+                            .Select(
+                                error =>
+                                    error.Description)
                 });
         }
 
         IdentityResult roleResult =
-            await _userManager.AddToRoleAsync(
-                user,
-                role);
+            await _userManager
+                .AddToRoleAsync(
+                    user,
+                    role);
 
         if (!roleResult.Succeeded)
         {
-            await _userManager.DeleteAsync(user);
+            await _userManager
+                .DeleteAsync(
+                    user);
 
             return BadRequest(
                 new
@@ -372,26 +472,32 @@ public sealed class AuthController : ControllerBase
                         "Account role could not be assigned.",
 
                     errors =
-                        roleResult.Errors.Select(
-                            error =>
-                                error.Description)
+                        roleResult
+                            .Errors
+                            .Select(
+                                error =>
+                                    error.Description)
                 });
         }
 
         /*
-         * A Team Lead is also an employee and therefore receives
-         * both TeamLead and Employee roles.
+         * Team Leads are also Employees.
          */
-        if (role == AppRoles.TeamLead)
+        if (
+            role ==
+            AppRoles.TeamLead)
         {
             IdentityResult employeeRoleResult =
-                await _userManager.AddToRoleAsync(
-                    user,
-                    AppRoles.Employee);
+                await _userManager
+                    .AddToRoleAsync(
+                        user,
+                        AppRoles.Employee);
 
             if (!employeeRoleResult.Succeeded)
             {
-                await _userManager.DeleteAsync(user);
+                await _userManager
+                    .DeleteAsync(
+                        user);
 
                 return BadRequest(
                     new
@@ -400,9 +506,11 @@ public sealed class AuthController : ControllerBase
                             "The Team Lead employee role could not be assigned.",
 
                         errors =
-                            employeeRoleResult.Errors.Select(
-                                error =>
-                                    error.Description)
+                            employeeRoleResult
+                                .Errors
+                                .Select(
+                                    error =>
+                                        error.Description)
                     });
             }
         }
@@ -439,21 +547,25 @@ public sealed class AuthController : ControllerBase
     {
         HashSet<string> assignedRoles =
             roles.ToHashSet(
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer
+                    .OrdinalIgnoreCase);
 
-        if (assignedRoles.Contains(
+        if (
+            assignedRoles.Contains(
                 AppRoles.SuperAdmin))
         {
             return AppRoles.SuperAdmin;
         }
 
-        if (assignedRoles.Contains(
+        if (
+            assignedRoles.Contains(
                 AppRoles.TeamLead))
         {
             return AppRoles.TeamLead;
         }
 
-        if (assignedRoles.Contains(
+        if (
+            assignedRoles.Contains(
                 AppRoles.Employee))
         {
             return AppRoles.Employee;
@@ -466,6 +578,7 @@ public sealed class AuthController : ControllerBase
     private string CreateJwtToken(
         ApplicationUser user,
         IEnumerable<string> roles,
+        IEnumerable<string> permissions,
         DateTime expiresAtUtc)
     {
         var claims =
@@ -482,7 +595,8 @@ public sealed class AuthController : ControllerBase
 
                 new(
                     JwtRegisteredClaimNames.Jti,
-                    Guid.NewGuid().ToString()),
+                    Guid.NewGuid()
+                        .ToString()),
 
                 new(
                     ClaimTypes.NameIdentifier,
@@ -493,8 +607,11 @@ public sealed class AuthController : ControllerBase
                     user.FullName)
             };
 
-        foreach (string role in roles.Distinct(
-                     StringComparer.OrdinalIgnoreCase))
+        foreach (
+            string role
+            in roles.Distinct(
+                StringComparer
+                    .OrdinalIgnoreCase))
         {
             claims.Add(
                 new Claim(
@@ -502,12 +619,33 @@ public sealed class AuthController : ControllerBase
                     role));
         }
 
+        /*
+         * Store every assigned permission
+         * as a separate JWT claim.
+         *
+         * Example:
+         * permission = employees.view
+         * permission = projects.manage
+         */
+        foreach (
+            string permission
+            in permissions.Distinct(
+                StringComparer
+                    .OrdinalIgnoreCase))
+        {
+            claims.Add(
+                new Claim(
+                    AppPermissions.ClaimType,
+                    permission));
+        }
+
         if (user.DepartmentId.HasValue)
         {
             claims.Add(
                 new Claim(
                     "departmentId",
-                    user.DepartmentId.Value
+                    user.DepartmentId
+                        .Value
                         .ToString()));
         }
 
@@ -516,7 +654,8 @@ public sealed class AuthController : ControllerBase
             claims.Add(
                 new Claim(
                     "employeeId",
-                    user.EmployeeId.Value
+                    user.EmployeeId
+                        .Value
                         .ToString()));
         }
 
@@ -528,7 +667,8 @@ public sealed class AuthController : ControllerBase
         var signingCredentials =
             new SigningCredentials(
                 signingKey,
-                SecurityAlgorithms.HmacSha256);
+                SecurityAlgorithms
+                    .HmacSha256);
 
         var token =
             new JwtSecurityToken(
@@ -551,26 +691,32 @@ public sealed class AuthController : ControllerBase
                     signingCredentials);
 
         return new JwtSecurityTokenHandler()
-            .WriteToken(token);
+            .WriteToken(
+                token);
     }
 
-    private async Task<string?> ValidateRoleDataAsync(
-        string role,
-        Guid? departmentId,
-        Guid? employeeId)
+    private async Task<string?>
+        ValidateRoleDataAsync(
+            string role,
+            Guid? departmentId,
+            Guid? employeeId)
     {
-        if (role == AppRoles.SuperAdmin)
+        if (
+            role ==
+            AppRoles.SuperAdmin)
         {
             return null;
         }
 
         if (departmentId is null)
         {
-            return "Department is required.";
+            return
+                "Department is required.";
         }
 
         bool departmentExists =
-            await _databaseContext.Departments
+            await _databaseContext
+                .Departments
                 .AnyAsync(
                     department =>
                         department.Id ==
@@ -593,11 +739,13 @@ public sealed class AuthController : ControllerBase
 
         if (employeeId is null)
         {
-            return "Employee ID is required.";
+            return
+                "Employee ID is required.";
         }
 
         Employee? employee =
-            await _databaseContext.Employees
+            await _databaseContext
+                .Employees
                 .AsNoTracking()
                 .FirstOrDefaultAsync(
                     currentEmployee =>
@@ -611,7 +759,8 @@ public sealed class AuthController : ControllerBase
         }
 
         bool alreadyLinked =
-            await _userManager.Users
+            await _userManager
+                .Users
                 .AnyAsync(
                     user =>
                         user.EmployeeId ==
@@ -623,7 +772,9 @@ public sealed class AuthController : ControllerBase
                 "This employee already has a user account.";
         }
 
-        if (employee.DepartmentId != departmentId)
+        if (
+            employee.DepartmentId !=
+            departmentId)
         {
             return
                 "The employee does not belong to the selected department.";
@@ -633,35 +784,36 @@ public sealed class AuthController : ControllerBase
     }
 
     public sealed record AvailableEmployeeResponse(
-    Guid Id,
-    string FullName,
-    string Email,
-    Guid? DepartmentId);
+        Guid Id,
+        string FullName,
+        string Email,
+        Guid? DepartmentId);
 
     private static string NormalizeRole(
         string role)
     {
         return role
             .Trim()
-            .ToLowerInvariant() switch
-        {
-            "superadmin" =>
-                AppRoles.SuperAdmin,
+            .ToLowerInvariant()
+            switch
+            {
+                "superadmin" =>
+                    AppRoles.SuperAdmin,
 
-            "super admin" =>
-                AppRoles.SuperAdmin,
+                "super admin" =>
+                    AppRoles.SuperAdmin,
 
-            "teamlead" =>
-                AppRoles.TeamLead,
+                "teamlead" =>
+                    AppRoles.TeamLead,
 
-            "team lead" =>
-                AppRoles.TeamLead,
+                "team lead" =>
+                    AppRoles.TeamLead,
 
-            "employee" =>
-                AppRoles.Employee,
+                "employee" =>
+                    AppRoles.Employee,
 
-            _ =>
-                role.Trim()
-        };
+                _ =>
+                    role.Trim()
+            };
     }
 }

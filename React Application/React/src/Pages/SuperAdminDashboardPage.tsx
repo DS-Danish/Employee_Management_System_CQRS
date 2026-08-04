@@ -10,6 +10,7 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import SecurityIcon from "@mui/icons-material/Security";
 import WorkIcon from "@mui/icons-material/Work";
 
 import {
@@ -74,7 +75,6 @@ interface ManagementCardProps {
 
 export default function SuperAdminDashboardPage():
   React.ReactElement {
-
   const currentUser: StoredUser | null =
     getStoredUser();
 
@@ -221,9 +221,9 @@ export default function SuperAdminDashboardPage():
                   {currentUser?.fullName ??
                     "Super Admin"}
                   . Manage employees,
-                  departments, projects
-                  and user access from
-                  one place.
+                  departments, projects,
+                  user access and permissions
+                  from one place.
                 </Typography>
               </Box>
 
@@ -441,6 +441,22 @@ export default function SuperAdminDashboardPage():
                 icon={
                   <ManageAccountsIcon />
                 }
+              />
+            </Grid>
+
+            <Grid
+              size={{
+                xs: 12,
+                sm: 6,
+                lg: 3,
+              }}
+            >
+              <ManagementCard
+                title="Permissions"
+                description="Assign application permissions to employees and team leads."
+                buttonLabel="Manage permissions"
+                path="/super-admin/permissions"
+                icon={<SecurityIcon />}
               />
             </Grid>
           </Grid>

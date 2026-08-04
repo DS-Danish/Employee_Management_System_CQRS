@@ -1,6 +1,9 @@
 import { useState } from "react";
 import type { SyntheticEvent } from "react";
-import { useNavigate } from "react-router-dom";
+
+import {
+  useNavigate,
+} from "react-router-dom";
 
 import {
   Alert,
@@ -20,118 +23,193 @@ import type {
   UserRole,
 } from "../Types/auth";
 
-const API_BASE_URL =
+const configuredBaseUrl: string =
   import.meta.env.VITE_API_BASE_URL ??
-  "http://localhost:5000/api";
+  "http://localhost:5262/api";
 
-const TOKEN_KEY = "authToken";
-const USER_KEY = "authUser";
+const API_BASE_URL: string =
+  configuredBaseUrl.replace(
+    /\/+$/,
+    "",
+  );
 
-export default function LoginPage(): React.ReactElement {
-  const navigate = useNavigate();
+const LOGIN_URL: string =
+  API_BASE_URL.endsWith("/api")
+    ? `${API_BASE_URL}/auth/login`
+    : `${API_BASE_URL}/api/auth/login`;
 
-  const [email, setEmail] =
+const TOKEN_KEY =
+  "authToken";
+
+const USER_KEY =
+  "authUser";
+
+export default function LoginPage():
+  React.ReactElement {
+  const navigate =
+    useNavigate();
+
+  const [
+    email,
+    setEmail,
+  ] =
     useState<string>("");
 
-  const [password, setPassword] =
+  const [
+    password,
+    setPassword,
+  ] =
     useState<string>("");
 
-  const [error, setError] =
+  const [
+    error,
+    setError,
+  ] =
     useState<string>("");
 
-  const [isSubmitting, setIsSubmitting] =
-    useState<boolean>(false);
+  const [
+    isSubmitting,
+    setIsSubmitting,
+  ] =
+    useState<boolean>(
+      false,
+    );
 
   const handleSubmit = async (
-    event: SyntheticEvent<HTMLFormElement>,
+    event:
+      SyntheticEvent<HTMLFormElement>,
   ): Promise<void> => {
     event.preventDefault();
+
     setError("");
 
     const normalizedEmail =
-      email.trim().toLowerCase();
+      email
+        .trim()
+        .toLowerCase();
 
     if (!normalizedEmail) {
-      setError("Email is required.");
+      setError(
+        "Email is required.",
+      );
+
       return;
     }
 
     if (!password) {
-      setError("Password is required.");
+      setError(
+        "Password is required.",
+      );
+
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSubmitting(
+      true,
+    );
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/auth/login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
+      /*
+       * The frontend sends only
+       * email + password.
+       *
+       * The backend determines
+       * the user's actual role.
+       */
+      const response =
+        await fetch(
+          LOGIN_URL,
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                email:
+                  normalizedEmail,
+
+                password,
+              }),
           },
-          body: JSON.stringify({
-            email: normalizedEmail,
-            password,
-          }),
-        },
-      );
+        );
 
       const responseBody =
-        await readResponseBody(response);
+        await readResponseBody(
+          response,
+        );
 
       if (!response.ok) {
-        const fallbackMessage =
-          response.status === 401
-            ? "The email address or password is incorrect."
-            : `Login failed with status ${response.status}.`;
-
         throw new Error(
           getErrorMessage(
             responseBody,
-            fallbackMessage,
+            "Login failed. Check your email and password.",
           ),
         );
       }
 
-      if (!isLoginResponse(responseBody)) {
-        throw new Error(
-          "The API returned an invalid login response.",
-        );
-      }
+      const loginResponse =
+        responseBody as LoginResponse;
 
-      const loginResponse: LoginResponse =
-        responseBody;
-
-      if (!loginResponse.token) {
+      if (
+        !loginResponse.token
+      ) {
         throw new Error(
           "The API did not return an authentication token.",
         );
       }
 
-      const parsedRole =
-        parseUserRole(loginResponse.role);
-
-      if (!parsedRole) {
+      if (
+        !isUserRole(
+          loginResponse.role,
+        )
+      ) {
         throw new Error(
-          `The API returned an unsupported account role: ${
-            String(loginResponse.role)
-          }.`,
+          "The API returned an unsupported account role.",
         );
       }
 
-      const storedUser: StoredUser = {
-        userId: loginResponse.userId,
-        fullName: loginResponse.fullName,
-        email: loginResponse.email,
-        role: parsedRole,
+      /*
+       * Store the authenticated
+       * user's details.
+       *
+       * Permissions come directly
+       * from the backend login
+       * response.
+       */
+      const storedUser:
+        StoredUser = {
+        userId:
+          loginResponse.userId,
+
+        fullName:
+          loginResponse.fullName,
+
+        email:
+          loginResponse.email,
+
+        role:
+          loginResponse.role,
+
         departmentId:
           loginResponse.departmentId,
+
         employeeId:
           loginResponse.employeeId,
+
         expiresAtUtc:
           loginResponse.expiresAtUtc,
+
+        permissions:
+          Array.isArray(
+            loginResponse.permissions,
+          )
+            ? loginResponse.permissions
+            : [],
       };
 
       localStorage.setItem(
@@ -141,19 +219,34 @@ export default function LoginPage(): React.ReactElement {
 
       localStorage.setItem(
         USER_KEY,
-        JSON.stringify(storedUser),
+        JSON.stringify(
+          storedUser,
+        ),
       );
 
+      /*
+       * Automatically redirect
+       * according to the role
+       * returned by the backend.
+       */
       navigate(
-        getDashboardPath(parsedRole),
+        getDashboardPath(
+          loginResponse.role,
+        ),
         {
-          replace: true,
+          replace:
+            true,
         },
       );
-    } catch (caughtError: unknown) {
+    } catch (
+      caughtError:
+        unknown
+    ) {
       clearAuthentication();
 
-      if (caughtError instanceof TypeError) {
+      if (
+        caughtError instanceof TypeError
+      ) {
         setError(
           `Could not connect to the API at ${API_BASE_URL}. ` +
             "Make sure the backend is running and VITE_API_BASE_URL is correct.",
@@ -162,8 +255,13 @@ export default function LoginPage(): React.ReactElement {
         return;
       }
 
-      if (caughtError instanceof Error) {
-        setError(caughtError.message);
+      if (
+        caughtError instanceof Error
+      ) {
+        setError(
+          caughtError.message,
+        );
+
         return;
       }
 
@@ -171,7 +269,9 @@ export default function LoginPage(): React.ReactElement {
         "An unexpected error occurred while signing in.",
       );
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(
+        false,
+      );
     }
   };
 
@@ -182,21 +282,35 @@ export default function LoginPage(): React.ReactElement {
     >
       <Box
         sx={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          py: 4,
+          minHeight:
+            "100vh",
+
+          display:
+            "flex",
+
+          alignItems:
+            "center",
+
+          py:
+            4,
         }}
       >
         <Paper
           elevation={4}
           sx={{
-            width: "100%",
+            width:
+              "100%",
+
             p: {
-              xs: 3,
-              sm: 5,
+              xs:
+                3,
+
+              sm:
+                5,
             },
-            borderRadius: 3,
+
+            borderRadius:
+              3,
           }}
         >
           <Typography
@@ -204,7 +318,8 @@ export default function LoginPage(): React.ReactElement {
             align="center"
             gutterBottom
             sx={{
-              fontWeight: 700,
+              fontWeight:
+                700,
             }}
           >
             Sign in
@@ -214,17 +329,21 @@ export default function LoginPage(): React.ReactElement {
             align="center"
             color="text.secondary"
             sx={{
-              mb: 3,
+              mb:
+                3,
             }}
           >
-            Sign in to the Employee Management System
+            Sign in to the
+            Employee Management
+            System
           </Typography>
 
           {error && (
             <Alert
               severity="error"
               sx={{
-                mb: 3,
+                mb:
+                  3,
               }}
             >
               {error}
@@ -233,7 +352,9 @@ export default function LoginPage(): React.ReactElement {
 
           <Box
             component="form"
-            onSubmit={handleSubmit}
+            onSubmit={
+              handleSubmit
+            }
             noValidate
           >
             <TextField
@@ -241,18 +362,28 @@ export default function LoginPage(): React.ReactElement {
               name="email"
               label="Email address"
               type="email"
-              value={email}
-              onChange={(event) => {
-                setEmail(event.target.value);
-                setError("");
-              }}
+              value={
+                email
+              }
+              onChange={
+                event => {
+                  setEmail(
+                    event.target.value,
+                  );
+
+                  setError("");
+                }
+              }
               autoComplete="email"
               autoFocus
               required
               fullWidth
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting
+              }
               sx={{
-                mb: 2,
+                mb:
+                  2,
               }}
             />
 
@@ -261,17 +392,27 @@ export default function LoginPage(): React.ReactElement {
               name="password"
               label="Password"
               type="password"
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-                setError("");
-              }}
+              value={
+                password
+              }
+              onChange={
+                event => {
+                  setPassword(
+                    event.target.value,
+                  );
+
+                  setError("");
+                }
+              }
               autoComplete="current-password"
               required
               fullWidth
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting
+              }
               sx={{
-                mb: 3,
+                mb:
+                  3,
               }}
             />
 
@@ -280,9 +421,12 @@ export default function LoginPage(): React.ReactElement {
               variant="contained"
               size="large"
               fullWidth
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting
+              }
               sx={{
-                minHeight: 48,
+                minHeight:
+                  48,
               }}
             >
               {isSubmitting ? (
@@ -291,7 +435,8 @@ export default function LoginPage(): React.ReactElement {
                     size={22}
                     color="inherit"
                     sx={{
-                      mr: 1,
+                      mr:
+                        1,
                     }}
                   />
 
@@ -308,8 +453,23 @@ export default function LoginPage(): React.ReactElement {
   );
 }
 
+function isUserRole(
+  role:
+    unknown,
+): role is UserRole {
+  return (
+    role ===
+      "Employee" ||
+    role ===
+      "TeamLead" ||
+    role ===
+      "SuperAdmin"
+  );
+}
+
 function getDashboardPath(
-  role: UserRole,
+  role:
+    UserRole,
 ): string {
   switch (role) {
     case "Employee":
@@ -323,115 +483,115 @@ function getDashboardPath(
   }
 }
 
-function parseUserRole(
-  role: unknown,
-): UserRole | null {
-  if (typeof role !== "string") {
-    return null;
-  }
-
-  const normalizedRole = role
-    .trim()
-    .replace(/[\s_-]+/g, "")
-    .toLowerCase();
-
-  switch (normalizedRole) {
-    case "employee":
-      return "Employee";
-
-    case "teamlead":
-      return "TeamLead";
-
-    case "superadmin":
-      return "SuperAdmin";
-
-    default:
-      return null;
-  }
-}
-
-function isLoginResponse(
-  value: unknown,
-): value is LoginResponse {
-  if (
-    typeof value !== "object" ||
-    value === null
-  ) {
-    return false;
-  }
-
-  const response =
-    value as Partial<LoginResponse>;
-
-  return (
-    typeof response.token === "string" &&
-    typeof response.userId === "string" &&
-    typeof response.fullName === "string" &&
-    typeof response.email === "string" &&
-    typeof response.role === "string"
-  );
-}
-
 async function readResponseBody(
-  response: Response,
+  response:
+    Response,
 ): Promise<unknown> {
-  const responseText =
+  const contentType =
+    response.headers.get(
+      "content-type",
+    );
+
+  if (
+    contentType?.includes(
+      "application/json",
+    )
+  ) {
+    return response.json();
+  }
+
+  const text =
     await response.text();
 
-  if (!responseText) {
+  if (!text) {
     return {};
   }
 
-  try {
-    return JSON.parse(responseText) as unknown;
-  } catch {
-    return {
-      message: responseText,
-    };
-  }
+  return {
+    message:
+      text,
+  };
 }
 
 function getErrorMessage(
-  responseBody: unknown,
-  fallbackMessage: string,
+  responseBody:
+    unknown,
+
+  fallbackMessage:
+    string,
 ): string {
   if (
-    typeof responseBody !== "object" ||
-    responseBody === null
+    typeof responseBody !==
+      "object" ||
+    responseBody ===
+      null
   ) {
     return fallbackMessage;
   }
 
   const apiError =
-    responseBody as ApiErrorResponse & {
-      title?: string;
-    };
+    responseBody as ApiErrorResponse;
 
   if (
-    typeof apiError.message === "string" &&
+    typeof apiError.message ===
+      "string" &&
     apiError.message.trim()
   ) {
     return apiError.message;
   }
 
   if (
-    typeof apiError.title === "string" &&
+    Array.isArray(
+      apiError.errors,
+    ) &&
+    apiError.errors.length >
+      0
+  ) {
+    return apiError.errors.join(
+      " ",
+    );
+  }
+
+  if (
+    apiError.errors &&
+    !Array.isArray(
+      apiError.errors,
+    )
+  ) {
+    const validationMessages:
+      string[] =
+      Object.values(
+        apiError.errors,
+      ).flat();
+
+    if (
+      validationMessages.length >
+      0
+    ) {
+      return validationMessages.join(
+        " ",
+      );
+    }
+  }
+
+  if (
+    typeof apiError.title ===
+      "string" &&
     apiError.title.trim()
   ) {
     return apiError.title;
   }
 
-  if (
-    Array.isArray(apiError.errors) &&
-    apiError.errors.length > 0
-  ) {
-    return apiError.errors.join(" ");
-  }
-
   return fallbackMessage;
 }
 
-function clearAuthentication(): void {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+function clearAuthentication():
+  void {
+  localStorage.removeItem(
+    TOKEN_KEY,
+  );
+
+  localStorage.removeItem(
+    USER_KEY,
+  );
 }

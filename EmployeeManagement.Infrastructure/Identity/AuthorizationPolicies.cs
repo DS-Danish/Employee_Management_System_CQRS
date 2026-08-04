@@ -10,4 +10,16 @@ public static class AuthorizationPolicies
 
     public const string DeleteEmployees =
         "DeleteEmployees";
+
+    public const string ViewDepartments =
+        "ViewDepartments";
+
+    public const string ManageDepartments =
+        "ManageDepartments";
+
+    public const string ViewProjects =
+        "ViewProjects";
+
+    public const string ManageProjects =
+        "ManageProjects";
 }

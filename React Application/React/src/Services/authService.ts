@@ -36,30 +36,56 @@ async function readErrorMessage(
         responseText,
       ) as ApiErrorResponse;
 
+    /*
+     * Custom API error format:
+     *
+     * errors: [
+     *   "Error one",
+     *   "Error two"
+     * ]
+     */
     if (
       Array.isArray(
         error.errors,
       )
     ) {
-      return error.errors.join(" ");
+      if (
+        error.errors.length >
+        0
+      ) {
+        return error.errors.join(
+          " ",
+        );
+      }
     }
 
+    /*
+     * ASP.NET validation format:
+     *
+     * errors: {
+     *   Email: [
+     *     "Email is required."
+     *   ],
+     *   Password: [
+     *     "Password is required."
+     *   ]
+     * }
+     */
     if (
       error.errors &&
-      typeof error.errors === "object"
+      !Array.isArray(
+        error.errors,
+      )
     ) {
-      const validationMessages: string[] =
+      const validationMessages:
+        string[] =
         Object.values(
           error.errors,
-        ).flatMap(
-          (
-            messages: string[],
-          ): string[] =>
-            messages,
-        );
+        ).flat();
 
       if (
-        validationMessages.length > 0
+        validationMessages.length >
+        0
       ) {
         return validationMessages.join(
           " ",
@@ -82,7 +108,8 @@ async function readErrorMessage(
   }
 }
 
-function getAuthenticationToken(): string {
+function getAuthenticationToken():
+  string {
   const token: string | null =
     localStorage.getItem(
       "authToken",
@@ -107,16 +134,21 @@ export async function registerUser(
     await fetch(
       `${apiBaseUrl}/api/auth/register`,
       {
-        method: "POST",
+        method:
+          "POST",
+
         headers: {
           "Content-Type":
             "application/json",
+
           Authorization:
             `Bearer ${token}`,
         },
-        body: JSON.stringify(
-          request,
-        ),
+
+        body:
+          JSON.stringify(
+            request,
+          ),
       },
     );
 
@@ -142,7 +174,9 @@ export async function getAvailableEmployees():
     await fetch(
       `${apiBaseUrl}/api/auth/available-employees`,
       {
-        method: "GET",
+        method:
+          "GET",
+
         headers: {
           Authorization:
             `Bearer ${token}`,
@@ -170,14 +204,18 @@ export async function loginUser(
     await fetch(
       `${apiBaseUrl}/api/auth/login`,
       {
-        method: "POST",
+        method:
+          "POST",
+
         headers: {
           "Content-Type":
             "application/json",
         },
-        body: JSON.stringify(
-          request,
-        ),
+
+        body:
+          JSON.stringify(
+            request,
+          ),
       },
     );
 

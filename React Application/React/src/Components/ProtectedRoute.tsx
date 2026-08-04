@@ -10,21 +10,40 @@ import type {
 
 interface ProtectedRouteProps {
   allowedRoles?: UserRole[];
+
+  requiredPermissions?: string[];
+
+  permissionMode?:
+    | "all"
+    | "any";
 }
 
-const TOKEN_KEY = "authToken";
-const USER_KEY = "authUser";
+const TOKEN_KEY =
+  "authToken";
+
+const USER_KEY =
+  "authUser";
 
 export default function ProtectedRoute({
   allowedRoles,
-}: ProtectedRouteProps): React.ReactElement {
+  requiredPermissions,
+  permissionMode = "all",
+}: ProtectedRouteProps):
+  React.ReactElement {
   const token =
-    localStorage.getItem(TOKEN_KEY);
+    localStorage.getItem(
+      TOKEN_KEY,
+    );
 
   const storedUserJson =
-    localStorage.getItem(USER_KEY);
+    localStorage.getItem(
+      USER_KEY,
+    );
 
-  if (!token || !storedUserJson) {
+  if (
+    !token ||
+    !storedUserJson
+  ) {
     clearAuthentication();
 
     return (
@@ -35,13 +54,25 @@ export default function ProtectedRoute({
     );
   }
 
-  let currentUser: StoredUser;
+  let currentUser:
+    StoredUser;
 
   try {
-    currentUser =
+    const parsedUser =
       JSON.parse(
         storedUserJson,
       ) as StoredUser;
+
+    currentUser = {
+      ...parsedUser,
+
+      permissions:
+        Array.isArray(
+          parsedUser.permissions,
+        )
+          ? parsedUser.permissions
+          : [],
+    };
   } catch {
     clearAuthentication();
 
@@ -54,8 +85,12 @@ export default function ProtectedRoute({
   }
 
   if (
-    !isUserRole(currentUser.role) ||
-    isTokenExpired(currentUser.expiresAtUtc)
+    !isUserRole(
+      currentUser.role,
+    ) ||
+    isTokenExpired(
+      currentUser.expiresAtUtc,
+    )
   ) {
     clearAuthentication();
 
@@ -67,10 +102,15 @@ export default function ProtectedRoute({
     );
   }
 
+  /*
+   * Role authorization.
+   */
   if (
     allowedRoles &&
     allowedRoles.length > 0 &&
-    !allowedRoles.includes(currentUser.role)
+    !allowedRoles.includes(
+      currentUser.role,
+    )
   ) {
     return (
       <Navigate
@@ -80,6 +120,51 @@ export default function ProtectedRoute({
         replace
       />
     );
+  }
+
+  /*
+   * SuperAdmin has every application
+   * permission automatically.
+   */
+  const isSuperAdmin =
+    currentUser.role ===
+    "SuperAdmin";
+
+  if (
+    !isSuperAdmin &&
+    requiredPermissions &&
+    requiredPermissions.length > 0
+  ) {
+    const userPermissions =
+      currentUser.permissions ?? [];
+
+    const hasRequiredPermission =
+      permissionMode === "any"
+        ? requiredPermissions.some(
+            permission =>
+              userPermissions.includes(
+                permission,
+              ),
+          )
+        : requiredPermissions.every(
+            permission =>
+              userPermissions.includes(
+                permission,
+              ),
+          );
+
+    if (
+      !hasRequiredPermission
+    ) {
+      return (
+        <Navigate
+          to={getDashboardPath(
+            currentUser.role,
+          )}
+          replace
+        />
+      );
+    }
   }
 
   return <Outlet />;
@@ -118,16 +203,31 @@ function isTokenExpired(
   }
 
   const expirationTime =
-    new Date(expiresAtUtc).getTime();
+    new Date(
+      expiresAtUtc,
+    ).getTime();
 
-  if (Number.isNaN(expirationTime)) {
+  if (
+    Number.isNaN(
+      expirationTime,
+    )
+  ) {
     return true;
   }
 
-  return expirationTime <= Date.now();
+  return (
+    expirationTime <=
+    Date.now()
+  );
 }
 
-function clearAuthentication(): void {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+function clearAuthentication():
+  void {
+  localStorage.removeItem(
+    TOKEN_KEY,
+  );
+
+  localStorage.removeItem(
+    USER_KEY,
+  );
 }

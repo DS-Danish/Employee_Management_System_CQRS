@@ -1,14 +1,19 @@
 using System.Security.Claims;
 using System.Text;
+
 using EmployeeManagement.API.Middleware;
 using EmployeeManagement.API.Services;
+
 using EmployeeManagement.Application;
 using EmployeeManagement.Application.Abstractions;
+using EmployeeManagement.Application.Common.Constants;
+
 using EmployeeManagement.Infrastructure;
 using EmployeeManagement.Infrastructure.Identity;
+using EmployeeManagement.Infrastructure.Persistence;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using EmployeeManagement.Application.Common.Constants;
 
 WebApplicationBuilder builder =
     WebApplication.CreateBuilder(args);
@@ -23,7 +28,8 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(
     builder.Configuration);
 
-builder.Services.AddHttpContextAccessor();
+builder.Services
+    .AddHttpContextAccessor();
 
 builder.Services.AddScoped<
     ICurrentUserService,
@@ -47,7 +53,8 @@ builder.Services.AddCors(
 
 JwtSettings jwtSettings =
     builder.Configuration
-        .GetSection(JwtSettings.SectionName)
+        .GetSection(
+            JwtSettings.SectionName)
         .Get<JwtSettings>()
     ?? throw new InvalidOperationException(
         "The Jwt configuration section was not found.");
@@ -73,22 +80,30 @@ if (string.IsNullOrWhiteSpace(
         "Jwt:Audience is required.");
 }
 
-builder.Services.Configure<JwtSettings>(
-    builder.Configuration.GetSection(
-        JwtSettings.SectionName));
+builder.Services
+    .Configure<JwtSettings>(
+        builder.Configuration
+            .GetSection(
+                JwtSettings.SectionName));
 
 builder.Services
     .AddAuthentication(
         options =>
         {
-            options.DefaultAuthenticateScheme =
-                JwtBearerDefaults.AuthenticationScheme;
+            options
+                .DefaultAuthenticateScheme =
+                JwtBearerDefaults
+                    .AuthenticationScheme;
 
-            options.DefaultChallengeScheme =
-                JwtBearerDefaults.AuthenticationScheme;
+            options
+                .DefaultChallengeScheme =
+                JwtBearerDefaults
+                    .AuthenticationScheme;
 
-            options.DefaultScheme =
-                JwtBearerDefaults.AuthenticationScheme;
+            options
+                .DefaultScheme =
+                JwtBearerDefaults
+                    .AuthenticationScheme;
         })
     .AddJwtBearer(
         options =>
@@ -99,7 +114,8 @@ builder.Services
             options.SaveToken =
                 true;
 
-            options.TokenValidationParameters =
+            options
+                .TokenValidationParameters =
                 new TokenValidationParameters
                 {
                     ValidateIssuer =
@@ -119,8 +135,10 @@ builder.Services
 
                     IssuerSigningKey =
                         new SymmetricSecurityKey(
-                            Encoding.UTF8.GetBytes(
-                                jwtSettings.Key)),
+                            Encoding.UTF8
+                                .GetBytes(
+                                    jwtSettings
+                                        .Key)),
 
                     ValidateLifetime =
                         true,
@@ -132,7 +150,8 @@ builder.Services
                         ClaimTypes.Role,
 
                     NameClaimType =
-                        ClaimTypes.NameIdentifier
+                        ClaimTypes
+                            .NameIdentifier,
                 };
         });
 
@@ -140,29 +159,157 @@ builder.Services.AddAuthorization(
     options =>
     {
         options.AddPolicy(
-            AuthorizationPolicies.ViewEmployees,
+            AuthorizationPolicies
+                .ViewEmployees,
             policy =>
             {
-                policy.RequireRole(
-                    AppRoles.SuperAdmin,
-                    AppRoles.TeamLead);
+                policy
+                    .RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User
+                            .IsInRole(
+                                AppRoles
+                                    .SuperAdmin) ||
+                        context.User
+                            .HasClaim(
+                                AppPermissions
+                                    .ClaimType,
+                                AppPermissions
+                                    .ViewEmployees));
             });
 
         options.AddPolicy(
-            AuthorizationPolicies.ManageEmployees,
+            AuthorizationPolicies
+                .ManageEmployees,
             policy =>
             {
-                policy.RequireRole(
-                    AppRoles.SuperAdmin,
-                    AppRoles.TeamLead);
+                policy
+                    .RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User
+                            .IsInRole(
+                                AppRoles
+                                    .SuperAdmin) ||
+                        context.User
+                            .HasClaim(
+                                AppPermissions
+                                    .ClaimType,
+                                AppPermissions
+                                    .ManageEmployees));
             });
 
         options.AddPolicy(
-            AuthorizationPolicies.DeleteEmployees,
+            AuthorizationPolicies
+                .DeleteEmployees,
             policy =>
             {
-                policy.RequireRole(
-                    AppRoles.SuperAdmin);
+                policy
+                    .RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User
+                            .IsInRole(
+                                AppRoles
+                                    .SuperAdmin) ||
+                        context.User
+                            .HasClaim(
+                                AppPermissions
+                                    .ClaimType,
+                                AppPermissions
+                                    .DeleteEmployees));
+            });
+
+        options.AddPolicy(
+            AuthorizationPolicies
+                .ViewDepartments,
+            policy =>
+            {
+                policy
+                    .RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User
+                            .IsInRole(
+                                AppRoles
+                                    .SuperAdmin) ||
+                        context.User
+                            .HasClaim(
+                                AppPermissions
+                                    .ClaimType,
+                                AppPermissions
+                                    .ViewDepartments));
+            });
+
+        options.AddPolicy(
+            AuthorizationPolicies
+                .ManageDepartments,
+            policy =>
+            {
+                policy
+                    .RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User
+                            .IsInRole(
+                                AppRoles
+                                    .SuperAdmin) ||
+                        context.User
+                            .HasClaim(
+                                AppPermissions
+                                    .ClaimType,
+                                AppPermissions
+                                    .ManageDepartments));
+            });
+
+        options.AddPolicy(
+            AuthorizationPolicies
+                .ViewProjects,
+            policy =>
+            {
+                policy
+                    .RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User
+                            .IsInRole(
+                                AppRoles
+                                    .SuperAdmin) ||
+                        context.User
+                            .HasClaim(
+                                AppPermissions
+                                    .ClaimType,
+                                AppPermissions
+                                    .ViewProjects));
+            });
+
+        options.AddPolicy(
+            AuthorizationPolicies
+                .ManageProjects,
+            policy =>
+            {
+                policy
+                    .RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User
+                            .IsInRole(
+                                AppRoles
+                                    .SuperAdmin) ||
+                        context.User
+                            .HasClaim(
+                                AppPermissions
+                                    .ClaimType,
+                                AppPermissions
+                                    .ManageProjects));
             });
     });
 

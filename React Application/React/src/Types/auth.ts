@@ -3,6 +3,13 @@ export type UserRole =
   | "TeamLead"
   | "Employee";
 
+export interface AvailableEmployee {
+  id: string;
+  fullName: string;
+  email: string;
+  departmentId: string | null;
+}
+
 export interface RegisterRequest {
   fullName: string;
   email: string;
@@ -29,12 +36,16 @@ export interface LoginRequest {
 export interface LoginResponse {
   token: string;
   expiresAtUtc: string;
+
   userId: string;
   fullName: string;
   email: string;
   role: UserRole;
+
   departmentId: string | null;
   employeeId: string | null;
+
+  permissions: string[];
 }
 
 export interface StoredUser {
@@ -42,22 +53,21 @@ export interface StoredUser {
   fullName: string;
   email: string;
   role: UserRole;
+
   departmentId: string | null;
   employeeId: string | null;
+
   expiresAtUtc: string;
+
+  permissions: string[];
 }
 
 export interface ApiErrorResponse {
   message?: string;
+
   title?: string;
+
   errors?:
     | string[]
     | Record<string, string[]>;
-}
-
-export interface AvailableEmployee {
-  id: string;
-  fullName: string;
-  email: string;
-  departmentId?: string | null;
 }

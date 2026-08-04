@@ -12,20 +12,21 @@ public static class DbSeeder
     private const string DevelopmentEmployeePassword =
         "12345";
 
-    private const string TeamLeadEmail =
-        "ali.khan@example.com";
-
     private const string SuperAdminEmail =
-        "superadmin@gmail.com";
+        "superadmin@ems.com";
 
     private const string SuperAdminPassword =
-        "12345";
+        "SuperAdmin@123";
 
     private const string SuperAdminFullName =
         "System Super Admin";
 
-    private const string ObsoleteAdminRole =
-        "Admin";
+    /*
+     * This existing employee will become the Team Lead.
+     * Change this email if employee2@ems.com does not exist.
+     */
+    private const string TeamLeadEmail =
+        "employee2@ems.com";
 
     public static async Task SeedAsync(
         IServiceProvider serviceProvider)
@@ -45,150 +46,176 @@ public static class DbSeeder
             scope.ServiceProvider
                 .GetRequiredService<UserManager<ApplicationUser>>();
 
+        /*
+         * Apply any outstanding EF Core migrations first.
+         *
+         * This is important because Permissions and
+         * UserPermissions must exist before permissions
+         * can be seeded.
+         */
         await dbContext.Database.MigrateAsync();
-
-        Console.WriteLine(
-            "Starting database seeding.");
 
         await SeedRolesAsync(
             roleManager);
 
-        await MigrateAdminRoleAsync(
-            userManager,
-            roleManager);
+        await SeedPermissionsAsync(
+            dbContext);
+
+        await SeedTeamLeadRelationshipAsync(
+            dbContext);
 
         await SeedEmployeeUsersAsync(
             dbContext,
             userManager);
-
-        await SeedTeamLeadRelationshipAsync(
-            dbContext);
 
         await SeedTeamLeadRoleAsync(
             userManager);
 
         await SeedSuperAdminAsync(
             userManager);
-
-        Console.WriteLine(
-            "Database seeding completed.");
     }
 
     private static async Task SeedRolesAsync(
         RoleManager<IdentityRole> roleManager)
     {
-        foreach (string roleName in AppRoles.All)
+        foreach (
+            string roleName
+            in AppRoles.All)
         {
-            if (await roleManager.RoleExistsAsync(
-                    roleName))
+            bool roleExists =
+                await roleManager.RoleExistsAsync(
+                    roleName);
+
+            if (roleExists)
             {
                 continue;
             }
 
+            IdentityRole role =
+                new(roleName);
+
             IdentityResult result =
                 await roleManager.CreateAsync(
-                    new IdentityRole(roleName));
+                    role);
 
             EnsureSucceeded(
                 result,
                 $"Failed to create role '{roleName}'.");
-
-            Console.WriteLine(
-                $"Created role: {roleName}");
         }
     }
 
-    private static async Task MigrateAdminRoleAsync(
-        UserManager<ApplicationUser> userManager,
-        RoleManager<IdentityRole> roleManager)
+    private static async Task SeedPermissionsAsync(
+        ApplicationDbContext dbContext)
     {
-        bool obsoleteRoleExists =
-            await roleManager.RoleExistsAsync(
-                ObsoleteAdminRole);
-
-        if (!obsoleteRoleExists)
+        foreach (
+            PermissionDefinition definition
+            in AppPermissions.All)
         {
-            return;
+            Permission? permission =
+                await dbContext
+                    .Permissions
+                    .FirstOrDefaultAsync(
+                        existingPermission =>
+                            existingPermission.Code ==
+                            definition.Code);
+
+            if (permission is null)
+            {
+                dbContext.Permissions.Add(
+                    new Permission
+                    {
+                        Name =
+                            definition.Name,
+
+                        Code =
+                            definition.Code
+                    });
+
+                continue;
+            }
+
+            /*
+             * Keep the human-readable name in sync
+             * if AppPermissions is changed later.
+             */
+            if (permission.Name != definition.Name)
+            {
+                permission.Name =
+                    definition.Name;
+            }
         }
 
-        IList<ApplicationUser> adminUsers =
-            await userManager.GetUsersInRoleAsync(
-                ObsoleteAdminRole);
+        await dbContext.SaveChangesAsync();
+    }
 
-        foreach (ApplicationUser user in adminUsers)
+    private static async Task SeedTeamLeadRelationshipAsync(
+        ApplicationDbContext dbContext)
+    {
+        string normalizedTeamLeadEmail =
+            TeamLeadEmail
+                .Trim()
+                .ToLowerInvariant();
+
+        Employee? teamLead =
+            await dbContext.Employees
+                .FirstOrDefaultAsync(
+                    employee =>
+                        employee.Email.ToLower() ==
+                        normalizedTeamLeadEmail);
+
+        if (teamLead is null)
         {
-            bool hasTeamLeadRole =
-                await userManager.IsInRoleAsync(
-                    user,
-                    AppRoles.TeamLead);
-
-            if (!hasTeamLeadRole)
-            {
-                IdentityResult addTeamLeadResult =
-                    await userManager.AddToRoleAsync(
-                        user,
-                        AppRoles.TeamLead);
-
-                EnsureSucceeded(
-                    addTeamLeadResult,
-                    $"Failed to assign role '{AppRoles.TeamLead}' " +
-                    $"to '{user.Email}'.");
-            }
-
-            bool hasEmployeeRole =
-                await userManager.IsInRoleAsync(
-                    user,
-                    AppRoles.Employee);
-
-            if (user.EmployeeId.HasValue &&
-                !hasEmployeeRole)
-            {
-                IdentityResult addEmployeeResult =
-                    await userManager.AddToRoleAsync(
-                        user,
-                        AppRoles.Employee);
-
-                EnsureSucceeded(
-                    addEmployeeResult,
-                    $"Failed to assign role '{AppRoles.Employee}' " +
-                    $"to '{user.Email}'.");
-            }
-
-            IdentityResult removeAdminResult =
-                await userManager.RemoveFromRoleAsync(
-                    user,
-                    ObsoleteAdminRole);
-
-            EnsureSucceeded(
-                removeAdminResult,
-                $"Failed to remove obsolete role " +
-                $"'{ObsoleteAdminRole}' from '{user.Email}'.");
+            Console.WriteLine(
+                $"Team Lead employee '{TeamLeadEmail}' was not found.");
 
             Console.WriteLine(
-                $"Migrated '{user.Email}' from " +
-                $"'{ObsoleteAdminRole}' to '{AppRoles.TeamLead}'.");
-        }
+                "Change TeamLeadEmail in DbSeeder.cs to an existing " +
+                "employee email.");
 
-        IdentityRole? obsoleteRole =
-            await roleManager.FindByNameAsync(
-                ObsoleteAdminRole);
-
-        if (obsoleteRole is null)
-        {
             return;
         }
 
-        IdentityResult deleteRoleResult =
-            await roleManager.DeleteAsync(
-                obsoleteRole);
+        List<Employee> employees =
+            await dbContext.Employees
+                .Where(
+                    employee =>
+                        employee.Id != teamLead.Id)
+                .ToListAsync();
 
-        EnsureSucceeded(
-            deleteRoleResult,
-            $"Failed to delete obsolete role " +
-            $"'{ObsoleteAdminRole}'.");
+        bool changesMade = false;
 
-        Console.WriteLine(
-            $"Deleted obsolete role: {ObsoleteAdminRole}");
+        foreach (
+            Employee employee
+            in employees)
+        {
+            if (
+                employee.TeamLeadId ==
+                teamLead.Id)
+            {
+                continue;
+            }
+
+            employee.AssignTeamLead(
+                teamLead.Id);
+
+            changesMade = true;
+        }
+
+        /*
+         * The Team Lead should not report
+         * to themselves or another employee.
+         */
+        if (teamLead.TeamLeadId is not null)
+        {
+            teamLead.RemoveTeamLead();
+
+            changesMade = true;
+        }
+
+        if (changesMade)
+        {
+            await dbContext.SaveChangesAsync();
+        }
     }
 
     private static async Task SeedEmployeeUsersAsync(
@@ -200,9 +227,12 @@ public static class DbSeeder
                 .AsNoTracking()
                 .ToListAsync();
 
-        foreach (Employee employee in employees)
+        foreach (
+            Employee employee
+            in employees)
         {
-            if (string.IsNullOrWhiteSpace(
+            if (
+                string.IsNullOrWhiteSpace(
                     employee.Email))
             {
                 continue;
@@ -214,9 +244,9 @@ public static class DbSeeder
                     .ToLowerInvariant();
 
             ApplicationUser? user =
-                await FindUserByEmailAsync(
-                    userManager,
-                    email);
+                await userManager
+                    .FindByEmailAsync(
+                        email);
 
             if (user is null)
             {
@@ -244,16 +274,14 @@ public static class DbSeeder
                     };
 
                 IdentityResult createResult =
-                    await userManager.CreateAsync(
-                        user,
-                        DevelopmentEmployeePassword);
+                    await userManager
+                        .CreateAsync(
+                            user,
+                            DevelopmentEmployeePassword);
 
                 EnsureSucceeded(
                     createResult,
                     $"Failed to create employee user '{email}'.");
-
-                Console.WriteLine(
-                    $"Created employee user: {email}");
             }
             else
             {
@@ -264,7 +292,9 @@ public static class DbSeeder
                     $"{employee.FirstName} {employee.LastName}"
                         .Trim();
 
-                if (user.FullName != expectedFullName)
+                if (
+                    user.FullName !=
+                    expectedFullName)
                 {
                     user.FullName =
                         expectedFullName;
@@ -273,7 +303,9 @@ public static class DbSeeder
                         true;
                 }
 
-                if (user.EmployeeId != employee.Id)
+                if (
+                    user.EmployeeId !=
+                    employee.Id)
                 {
                     user.EmployeeId =
                         employee.Id;
@@ -282,7 +314,8 @@ public static class DbSeeder
                         true;
                 }
 
-                if (user.DepartmentId !=
+                if (
+                    user.DepartmentId !=
                     employee.DepartmentId)
                 {
                     user.DepartmentId =
@@ -304,8 +337,9 @@ public static class DbSeeder
                 if (requiresUpdate)
                 {
                     IdentityResult updateResult =
-                        await userManager.UpdateAsync(
-                            user);
+                        await userManager
+                            .UpdateAsync(
+                                user);
 
                     EnsureSucceeded(
                         updateResult,
@@ -320,74 +354,18 @@ public static class DbSeeder
         }
     }
 
-    private static async Task SeedTeamLeadRelationshipAsync(
-        ApplicationDbContext dbContext)
-    {
-        string normalizedEmail =
-            TeamLeadEmail
-                .Trim()
-                .ToLowerInvariant();
-
-        Employee? teamLead =
-            await dbContext.Employees
-                .FirstOrDefaultAsync(
-                    employee =>
-                        employee.Email.ToLower() ==
-                        normalizedEmail);
-
-        if (teamLead is null)
-        {
-            Console.WriteLine(
-                $"Team Lead employee not found: " +
-                $"{TeamLeadEmail}");
-
-            return;
-        }
-
-        List<Employee> employees =
-            await dbContext.Employees
-                .Where(
-                    employee =>
-                        employee.Id != teamLead.Id)
-                .ToListAsync();
-
-        foreach (Employee employee in employees)
-        {
-            if (employee.TeamLeadId ==
-                teamLead.Id)
-            {
-                continue;
-            }
-
-            employee.AssignTeamLead(
-                teamLead.Id);
-        }
-
-        if (teamLead.TeamLeadId is not null)
-        {
-            teamLead.RemoveTeamLead();
-        }
-
-        await dbContext.SaveChangesAsync();
-
-        Console.WriteLine(
-            $"Assigned {employees.Count} employees to Team Lead " +
-            $"'{TeamLeadEmail}'.");
-    }
-
     private static async Task SeedTeamLeadRoleAsync(
         UserManager<ApplicationUser> userManager)
     {
         ApplicationUser? teamLead =
-            await FindUserByEmailAsync(
-                userManager,
-                TeamLeadEmail);
+            await userManager
+                .FindByEmailAsync(
+                    TeamLeadEmail);
 
         if (teamLead is null)
         {
             Console.WriteLine(
-                $"Team Lead user not found: " +
-                $"{TeamLeadEmail}");
+                $"Team Lead user '{TeamLeadEmail}' was not found.");
 
             return;
         }
@@ -395,12 +373,15 @@ public static class DbSeeder
         if (teamLead.EmployeeId is null)
         {
             Console.WriteLine(
-                $"Team Lead user '{TeamLeadEmail}' is not linked " +
-                "to an employee.");
+                $"User '{TeamLeadEmail}' is not linked to an employee.");
 
             return;
         }
 
+        /*
+         * A Team Lead is still an Employee,
+         * therefore both roles are assigned.
+         */
         await AddRoleIfMissingAsync(
             userManager,
             teamLead,
@@ -410,24 +391,15 @@ public static class DbSeeder
             userManager,
             teamLead,
             AppRoles.TeamLead);
-
-        Console.WriteLine(
-            $"Team Lead role assigned to: " +
-            $"{TeamLeadEmail}");
     }
 
     private static async Task SeedSuperAdminAsync(
         UserManager<ApplicationUser> userManager)
     {
-        string normalizedEmail =
-            SuperAdminEmail
-                .Trim()
-                .ToLowerInvariant();
-
         ApplicationUser? superAdmin =
-            await FindUserByEmailAsync(
-                userManager,
-                normalizedEmail);
+            await userManager
+                .FindByEmailAsync(
+                    SuperAdminEmail);
 
         if (superAdmin is null)
         {
@@ -435,10 +407,10 @@ public static class DbSeeder
                 new ApplicationUser
                 {
                     UserName =
-                        normalizedEmail,
+                        SuperAdminEmail,
 
                     Email =
-                        normalizedEmail,
+                        SuperAdminEmail,
 
                     EmailConfirmed =
                         true,
@@ -454,29 +426,48 @@ public static class DbSeeder
                 };
 
             IdentityResult createResult =
-                await userManager.CreateAsync(
-                    superAdmin,
-                    SuperAdminPassword);
+                await userManager
+                    .CreateAsync(
+                        superAdmin,
+                        SuperAdminPassword);
 
             EnsureSucceeded(
                 createResult,
-                $"Failed to create Super Admin " +
-                $"'{SuperAdminEmail}'.");
-
-            Console.WriteLine(
-                $"Created Super Admin: " +
-                $"{SuperAdminEmail}");
+                $"Failed to create Super Admin '{SuperAdminEmail}'.");
         }
         else
         {
             bool requiresUpdate =
                 false;
 
-            if (superAdmin.FullName !=
+            if (
+                superAdmin.FullName !=
                 SuperAdminFullName)
             {
                 superAdmin.FullName =
                     SuperAdminFullName;
+
+                requiresUpdate =
+                    true;
+            }
+
+            if (
+                superAdmin.EmployeeId
+                is not null)
+            {
+                superAdmin.EmployeeId =
+                    null;
+
+                requiresUpdate =
+                    true;
+            }
+
+            if (
+                superAdmin.DepartmentId
+                is not null)
+            {
+                superAdmin.DepartmentId =
+                    null;
 
                 requiresUpdate =
                     true;
@@ -491,67 +482,56 @@ public static class DbSeeder
                     true;
             }
 
-            if (superAdmin.EmployeeId is not null)
-            {
-                superAdmin.EmployeeId =
-                    null;
-
-                requiresUpdate =
-                    true;
-            }
-
-            if (superAdmin.DepartmentId is not null)
-            {
-                superAdmin.DepartmentId =
-                    null;
-
-                requiresUpdate =
-                    true;
-            }
-
             if (requiresUpdate)
             {
                 IdentityResult updateResult =
-                    await userManager.UpdateAsync(
-                        superAdmin);
+                    await userManager
+                        .UpdateAsync(
+                            superAdmin);
 
                 EnsureSucceeded(
                     updateResult,
-                    $"Failed to update Super Admin " +
-                    $"'{SuperAdminEmail}'.");
+                    "Failed to update the Super Admin account.");
             }
+        }
+
+        /*
+         * SuperAdmin should only require
+         * the SuperAdmin role.
+         */
+        IList<string> currentRoles =
+            await userManager
+                .GetRolesAsync(
+                    superAdmin);
+
+        string[] rolesToRemove =
+            currentRoles
+                .Where(
+                    role =>
+                        !string.Equals(
+                            role,
+                            AppRoles.SuperAdmin,
+                            StringComparison
+                                .OrdinalIgnoreCase))
+                .ToArray();
+
+        if (rolesToRemove.Length > 0)
+        {
+            IdentityResult removeResult =
+                await userManager
+                    .RemoveFromRolesAsync(
+                        superAdmin,
+                        rolesToRemove);
+
+            EnsureSucceeded(
+                removeResult,
+                "Failed to remove incorrect roles from Super Admin.");
         }
 
         await AddRoleIfMissingAsync(
             userManager,
             superAdmin,
             AppRoles.SuperAdmin);
-
-        await RemoveRoleIfPresentAsync(
-            userManager,
-            superAdmin,
-            AppRoles.Employee);
-
-        await RemoveRoleIfPresentAsync(
-            userManager,
-            superAdmin,
-            AppRoles.TeamLead);
-    }
-
-    private static async Task<ApplicationUser?>
-        FindUserByEmailAsync(
-            UserManager<ApplicationUser> userManager,
-            string email)
-    {
-        string normalizedEmail =
-            userManager.NormalizeEmail(
-                email.Trim());
-
-        return await userManager.Users
-            .FirstOrDefaultAsync(
-                user =>
-                    user.NormalizedEmail ==
-                    normalizedEmail);
     }
 
     private static async Task AddRoleIfMissingAsync(
@@ -559,59 +539,27 @@ public static class DbSeeder
         ApplicationUser user,
         string roleName)
     {
-        bool hasRole =
-            await userManager.IsInRoleAsync(
-                user,
-                roleName);
+        bool isAlreadyInRole =
+            await userManager
+                .IsInRoleAsync(
+                    user,
+                    roleName);
 
-        if (hasRole)
+        if (isAlreadyInRole)
         {
             return;
         }
 
         IdentityResult result =
-            await userManager.AddToRoleAsync(
-                user,
-                roleName);
+            await userManager
+                .AddToRoleAsync(
+                    user,
+                    roleName);
 
         EnsureSucceeded(
             result,
             $"Failed to assign role '{roleName}' " +
-            $"to '{user.Email}'.");
-
-        Console.WriteLine(
-            $"Assigned role '{roleName}' to " +
-            $"'{user.Email}'.");
-    }
-
-    private static async Task RemoveRoleIfPresentAsync(
-        UserManager<ApplicationUser> userManager,
-        ApplicationUser user,
-        string roleName)
-    {
-        bool hasRole =
-            await userManager.IsInRoleAsync(
-                user,
-                roleName);
-
-        if (!hasRole)
-        {
-            return;
-        }
-
-        IdentityResult result =
-            await userManager.RemoveFromRoleAsync(
-                user,
-                roleName);
-
-        EnsureSucceeded(
-            result,
-            $"Failed to remove role '{roleName}' " +
-            $"from '{user.Email}'.");
-
-        Console.WriteLine(
-            $"Removed role '{roleName}' from " +
-            $"'{user.Email}'.");
+            $"to user '{user.Email}'.");
     }
 
     private static void EnsureSucceeded(
@@ -628,12 +576,9 @@ public static class DbSeeder
                 Environment.NewLine,
                 result.Errors.Select(
                     error =>
-                        $"{error.Code}: " +
-                        $"{error.Description}"));
+                        $"{error.Code}: {error.Description}"));
 
         throw new InvalidOperationException(
-            $"{message}" +
-            $"{Environment.NewLine}" +
-            $"{errors}");
+            $"{message}{Environment.NewLine}{errors}");
     }
 }

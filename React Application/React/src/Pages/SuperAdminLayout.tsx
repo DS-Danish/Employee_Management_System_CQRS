@@ -15,6 +15,7 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import LogoutIcon from "@mui/icons-material/Logout";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import MenuIcon from "@mui/icons-material/Menu";
+import SecurityIcon from "@mui/icons-material/Security";
 import WorkIcon from "@mui/icons-material/Work";
 
 import {
@@ -75,6 +76,11 @@ const navigationItems: NavigationItem[] = [
     label: "Create User",
     path: "/super-admin/users/create",
     icon: <ManageAccountsIcon />,
+  },
+  {
+    label: "Permissions",
+    path: "/super-admin/permissions",
+    icon: <SecurityIcon />,
   },
 ];
 

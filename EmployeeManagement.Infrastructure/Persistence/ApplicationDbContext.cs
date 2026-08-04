@@ -31,6 +31,12 @@ public class ApplicationDbContext
     public DbSet<EmployeeProject> EmployeeProjects =>
         Set<EmployeeProject>();
 
+    public DbSet<Permission> Permissions =>
+        Set<Permission>();
+
+    public DbSet<UserPermission> UserPermissions =>
+        Set<UserPermission>();
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
@@ -42,25 +48,34 @@ public class ApplicationDbContext
         modelBuilder.Entity<ApplicationUser>(
             entity =>
             {
-                entity.Property(user => user.FullName)
+                entity.Property(
+                        user =>
+                            user.FullName)
                     .HasMaxLength(200)
                     .IsRequired();
 
-                entity.HasIndex(user => user.EmployeeId)
+                entity.HasIndex(
+                        user =>
+                            user.EmployeeId)
                     .IsUnique()
-                    .HasFilter("[EmployeeId] IS NOT NULL");
+                    .HasFilter(
+                        "[EmployeeId] IS NOT NULL");
 
                 entity.HasOne<Employee>()
                     .WithOne()
                     .HasForeignKey<ApplicationUser>(
-                        user => user.EmployeeId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                        user =>
+                            user.EmployeeId)
+                    .OnDelete(
+                        DeleteBehavior.Restrict);
 
                 entity.HasOne<Department>()
                     .WithMany()
                     .HasForeignKey(
-                        user => user.DepartmentId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                        user =>
+                            user.DepartmentId)
+                    .OnDelete(
+                        DeleteBehavior.Restrict);
             });
     }
 }

@@ -14,15 +14,13 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-interface StoredUser {
-  userId: string;
-  fullName: string;
-  email: string;
-  role: string;
-  departmentId: string | null;
-  employeeId: string | null;
-  expiresAtUtc: string;
-}
+import {
+  AppPermissions,
+} from "../Constants/permissions";
+
+import type {
+  StoredUser,
+} from "../Types/auth";
 
 interface EmployeeProfile {
   id: string;
@@ -30,18 +28,22 @@ interface EmployeeProfile {
   lastName: string;
   fullName: string;
   email: string;
+
   street: string;
   city: string;
   country: string;
   postalCode: string;
+
   departmentId: string | null;
   departmentName: string | null;
+
   createdAtUtc: string;
 }
 
 interface ProfileForm {
   firstName: string;
   lastName: string;
+
   street: string;
   city: string;
   country: string;
@@ -50,18 +52,36 @@ interface ProfileForm {
 
 interface ApiError {
   message?: string;
-  errors?: string[];
+  title?: string;
+
+  errors?:
+    | string[]
+    | Record<string, string[]>;
 }
 
 interface FormFieldProps {
   label: string;
-  name: keyof ProfileForm | "email" | "department";
+
+  name:
+    | keyof ProfileForm
+    | "email"
+    | "department";
+
   value: string;
+
   disabled?: boolean;
   required?: boolean;
+
   onChange?: (
     event: ChangeEvent<HTMLInputElement>,
   ) => void;
+}
+
+interface ModuleCard {
+  title: string;
+  description: string;
+  path: string;
+  permission: string;
 }
 
 const TOKEN_KEY =
@@ -71,7 +91,13 @@ const USER_KEY =
   "authUser";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "";
+  (
+    import.meta.env.VITE_API_BASE_URL ??
+    ""
+  ).replace(
+    /\/+$/,
+    "",
+  );
 
 const emptyProfileForm: ProfileForm = {
   firstName: "",
@@ -82,58 +108,146 @@ const emptyProfileForm: ProfileForm = {
   postalCode: "",
 };
 
-export default function DashboardPage() {
+const applicationModules: ModuleCard[] = [
+  {
+    title:
+      "Employees",
+
+    description:
+      "View employee information available to your account.",
+
+    path:
+      "/employee/employees",
+
+    permission:
+      AppPermissions.ViewEmployees,
+  },
+  {
+    title:
+      "Departments",
+
+    description:
+      "View departments and organizational information.",
+
+    path:
+      "/employee/departments",
+
+    permission:
+      AppPermissions.ViewDepartments,
+  },
+  {
+    title:
+      "Projects",
+
+    description:
+      "View projects available to your account.",
+
+    path:
+      "/employee/projects",
+
+    permission:
+      AppPermissions.ViewProjects,
+  },
+];
+
+export default function DashboardPage():
+  React.ReactElement {
   const navigate =
     useNavigate();
 
   const token =
-    localStorage.getItem(TOKEN_KEY);
+    localStorage.getItem(
+      TOKEN_KEY,
+    );
 
   const storedUserJson =
-    localStorage.getItem(USER_KEY);
+    localStorage.getItem(
+      USER_KEY,
+    );
 
-  const [currentUser, setCurrentUser] =
-    useState<StoredUser | null>(() => {
-      if (!storedUserJson) {
-        return null;
-      }
+  const [
+    currentUser,
+    setCurrentUser,
+  ] =
+    useState<StoredUser | null>(
+      () => {
+        if (!storedUserJson) {
+          return null;
+        }
 
-      try {
-        return JSON.parse(
-          storedUserJson,
-        ) as StoredUser;
-      } catch {
-        return null;
-      }
-    });
+        try {
+          const parsedUser =
+            JSON.parse(
+              storedUserJson,
+            ) as StoredUser;
 
-  const [profile, setProfile] =
-    useState<EmployeeProfile | null>(null);
+          return {
+            ...parsedUser,
 
-  const [form, setForm] =
+            permissions:
+              Array.isArray(
+                parsedUser.permissions,
+              )
+                ? parsedUser.permissions
+                : [],
+          };
+        } catch {
+          return null;
+        }
+      },
+    );
+
+  const [
+    profile,
+    setProfile,
+  ] =
+    useState<EmployeeProfile | null>(
+      null,
+    );
+
+  const [
+    form,
+    setForm,
+  ] =
     useState<ProfileForm>({
       ...emptyProfileForm,
     });
 
-  const [originalForm, setOriginalForm] =
+  const [
+    originalForm,
+    setOriginalForm,
+  ] =
     useState<ProfileForm>({
       ...emptyProfileForm,
     });
 
-  const [isLoading, setIsLoading] =
-    useState(true);
+  const [
+    isLoading,
+    setIsLoading,
+  ] =
+    useState<boolean>(
+      true,
+    );
 
-  const [isSaving, setIsSaving] =
-    useState(false);
+  const [
+    isSaving,
+    setIsSaving,
+  ] =
+    useState<boolean>(
+      false,
+    );
 
-  const [error, setError] =
-    useState("");
+  const [
+    error,
+    setError,
+  ] =
+    useState<string>("");
 
-  const [success, setSuccess] =
-    useState("");
-
-  const isEmployee =
-    currentUser?.role === "Employee";
+  const [
+    success,
+    setSuccess,
+  ] =
+    useState<string>("");
 
   const profileHasChanged =
     hasProfileChanged(
@@ -141,20 +255,35 @@ export default function DashboardPage() {
       originalForm,
     );
 
+  const visibleModules: ModuleCard[] =
+    currentUser
+      ? applicationModules.filter(
+          module =>
+            currentUser.permissions.includes(
+              module.permission,
+            ),
+        )
+      : [];
+
   useEffect(() => {
     if (
       !token ||
-      !currentUser ||
-      currentUser.role !== "Employee"
+      !currentUser
     ) {
-      setIsLoading(false);
+      setIsLoading(
+        false,
+      );
+
       return;
     }
 
     void loadProfile();
   }, []);
 
-  if (!token || !currentUser) {
+  if (
+    !token ||
+    !currentUser
+  ) {
     clearAuthentication();
 
     return (
@@ -165,7 +294,16 @@ export default function DashboardPage() {
     );
   }
 
-  async function loadProfile(): Promise<void> {
+  async function loadProfile():
+    Promise<void> {
+    if (!token) {
+      setIsLoading(
+        false,
+      );
+
+      return;
+    }
+
     setError("");
 
     try {
@@ -173,7 +311,9 @@ export default function DashboardPage() {
         await fetch(
           `${API_BASE_URL}/employees/me`,
           {
-            method: "GET",
+            method:
+              "GET",
+
             headers: {
               Authorization:
                 `Bearer ${token}`,
@@ -182,16 +322,22 @@ export default function DashboardPage() {
         );
 
       const responseBody =
-        await readResponseBody(response);
+        await readResponseBody(
+          response,
+        );
 
       if (!response.ok) {
-        if (response.status === 401) {
+        if (
+          response.status ===
+          401
+        ) {
           clearAuthentication();
 
           navigate(
             "/login",
             {
-              replace: true,
+              replace:
+                true,
             },
           );
 
@@ -214,22 +360,36 @@ export default function DashboardPage() {
           employeeProfile,
         );
 
-      setProfile(employeeProfile);
-      setForm(loadedForm);
-      setOriginalForm(loadedForm);
-    } catch (caughtError: unknown) {
+      setProfile(
+        employeeProfile,
+      );
+
+      setForm(
+        loadedForm,
+      );
+
+      setOriginalForm(
+        loadedForm,
+      );
+    } catch (
+      caughtError:
+        unknown
+    ) {
       setError(
         caughtError instanceof Error
           ? caughtError.message
           : "Your employee profile could not be loaded.",
       );
     } finally {
-      setIsLoading(false);
+      setIsLoading(
+        false,
+      );
     }
   }
 
   function handleInputChange(
-    event: ChangeEvent<HTMLInputElement>,
+    event:
+      ChangeEvent<HTMLInputElement>,
   ): void {
     const fieldName =
       event.target.name as keyof ProfileForm;
@@ -237,35 +397,68 @@ export default function DashboardPage() {
     const fieldValue =
       event.target.value;
 
-    setForm((currentForm) => ({
-      ...currentForm,
-      [fieldName]: fieldValue,
-    }));
+    setForm(
+      currentForm => ({
+        ...currentForm,
+
+        [fieldName]:
+          fieldValue,
+      }),
+    );
 
     setError("");
     setSuccess("");
   }
 
   async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
+    event:
+      FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault();
 
     setError("");
     setSuccess("");
 
-    if (!currentUser) {
-      setError(
-        "The signed-in user could not be found.",
+    /*
+     * currentUser is StoredUser | null.
+     *
+     * Check it again inside this async
+     * handler so TypeScript can safely
+     * treat it as StoredUser.
+     */
+    if (
+      !currentUser ||
+      !token
+    ) {
+      clearAuthentication();
+
+      navigate(
+        "/login",
+        {
+          replace:
+            true,
+        },
       );
 
       return;
     }
 
-    const normalizedForm =
-      normalizeProfileForm(form);
+    /*
+     * Capture a guaranteed StoredUser
+     * before entering async operations.
+     */
+    const authenticatedUser:
+      StoredUser =
+      currentUser;
 
-    if (!normalizedForm.firstName) {
+    const normalizedForm =
+      normalizeProfileForm(
+        form,
+      );
+
+    if (
+      !normalizedForm.firstName
+    ) {
       setError(
         "First name is required.",
       );
@@ -273,7 +466,9 @@ export default function DashboardPage() {
       return;
     }
 
-    if (!normalizedForm.lastName) {
+    if (
+      !normalizedForm.lastName
+    ) {
       setError(
         "Last name is required.",
       );
@@ -294,14 +489,18 @@ export default function DashboardPage() {
       return;
     }
 
-    setIsSaving(true);
+    setIsSaving(
+      true,
+    );
 
     try {
       const response =
         await fetch(
           `${API_BASE_URL}/employees/me`,
           {
-            method: "PUT",
+            method:
+              "PUT",
+
             headers: {
               "Content-Type":
                 "application/json",
@@ -309,23 +508,31 @@ export default function DashboardPage() {
               Authorization:
                 `Bearer ${token}`,
             },
-            body: JSON.stringify(
-              normalizedForm,
-            ),
+
+            body:
+              JSON.stringify(
+                normalizedForm,
+              ),
           },
         );
 
       const responseBody =
-        await readResponseBody(response);
+        await readResponseBody(
+          response,
+        );
 
       if (!response.ok) {
-        if (response.status === 401) {
+        if (
+          response.status ===
+          401
+        ) {
           clearAuthentication();
 
           navigate(
             "/login",
             {
-              replace: true,
+              replace:
+                true,
             },
           );
 
@@ -343,47 +550,55 @@ export default function DashboardPage() {
       const updatedFullName =
         `${normalizedForm.firstName} ${normalizedForm.lastName}`;
 
-      const updatedUser: StoredUser = {
-        userId:
-          currentUser.userId,
+      /*
+       * authenticatedUser is guaranteed
+       * to be StoredUser, so spreading it
+       * keeps all required properties:
+       *
+       * userId
+       * email
+       * role
+       * departmentId
+       * employeeId
+       * expiresAtUtc
+       * permissions
+       */
+      const updatedUser:
+        StoredUser = {
+        ...authenticatedUser,
 
         fullName:
           updatedFullName,
-
-        email:
-          currentUser.email,
-
-        role:
-          currentUser.role,
-
-        departmentId:
-          currentUser.departmentId,
-
-        employeeId:
-          currentUser.employeeId,
-
-        expiresAtUtc:
-          currentUser.expiresAtUtc,
       };
 
       localStorage.setItem(
         USER_KEY,
-        JSON.stringify(updatedUser),
+        JSON.stringify(
+          updatedUser,
+        ),
       );
 
-      setCurrentUser(updatedUser);
+      setCurrentUser(
+        updatedUser,
+      );
 
-      setForm(normalizedForm);
-      setOriginalForm(normalizedForm);
+      setForm(
+        normalizedForm,
+      );
+
+      setOriginalForm(
+        normalizedForm,
+      );
 
       setProfile(
-        (currentProfile) => {
+        currentProfile => {
           if (!currentProfile) {
             return currentProfile;
           }
 
           return {
             ...currentProfile,
+
             firstName:
               normalizedForm.firstName,
 
@@ -411,18 +626,24 @@ export default function DashboardPage() {
       setSuccess(
         "Your details were updated successfully.",
       );
-    } catch (caughtError: unknown) {
+    } catch (
+      caughtError:
+        unknown
+    ) {
       setError(
         caughtError instanceof Error
           ? caughtError.message
           : "Your profile could not be updated.",
       );
     } finally {
-      setIsSaving(false);
+      setIsSaving(
+        false,
+      );
     }
   }
 
-  function handleReset(): void {
+  function handleReset():
+    void {
     setForm({
       ...originalForm,
     });
@@ -431,48 +652,93 @@ export default function DashboardPage() {
     setSuccess("");
   }
 
-  function handleLogout(): void {
+  function handleLogout():
+    void {
     clearAuthentication();
 
     navigate(
       "/login",
       {
-        replace: true,
+        replace:
+          true,
       },
     );
   }
 
   return (
-    <main style={styles.page}>
-      <div style={styles.dashboard}>
-        <header style={styles.header}>
+    <main
+      style={
+        styles.page
+      }
+    >
+      <div
+        style={
+          styles.dashboard
+        }
+      >
+        <header
+          style={
+            styles.header
+          }
+        >
           <div>
-            <p style={styles.eyebrow}>
-              Employee Management System
+            <p
+              style={
+                styles.eyebrow
+              }
+            >
+              Employee Management
+              System
             </p>
 
-            <h1 style={styles.heading}>
-              Welcome, {currentUser.fullName}
+            <h1
+              style={
+                styles.heading
+              }
+            >
+              Welcome,{" "}
+              {currentUser.fullName}
             </h1>
 
-            <p style={styles.subtitle}>
-              Manage your employee profile and
-              personal information.
+            <p
+              style={
+                styles.subtitle
+              }
+            >
+              Manage your profile
+              and access the modules
+              assigned to you.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={handleLogout}
-            style={styles.logoutButton}
+            onClick={
+              handleLogout
+            }
+            style={
+              styles.logoutButton
+            }
           >
             Sign Out
           </button>
         </header>
 
-        <section style={styles.summaryGrid}>
-          <article style={styles.summaryCard}>
-            <span style={styles.label}>
+        <section
+          style={
+            styles.summaryGrid
+          }
+        >
+          <article
+            style={
+              styles.summaryCard
+            }
+          >
+            <span
+              style={
+                styles.label
+              }
+            >
               Email
             </span>
 
@@ -481,8 +747,16 @@ export default function DashboardPage() {
             </strong>
           </article>
 
-          <article style={styles.summaryCard}>
-            <span style={styles.label}>
+          <article
+            style={
+              styles.summaryCard
+            }
+          >
+            <span
+              style={
+                styles.label
+              }
+            >
               Role
             </span>
 
@@ -491,105 +765,280 @@ export default function DashboardPage() {
             </strong>
           </article>
 
-          <article style={styles.summaryCard}>
-            <span style={styles.label}>
+          <article
+            style={
+              styles.summaryCard
+            }
+          >
+            <span
+              style={
+                styles.label
+              }
+            >
               Department
             </span>
 
             <strong>
-              {profile?.departmentName ??
+              {profile
+                ?.departmentName ??
                 "Not assigned"}
+            </strong>
+          </article>
+
+          <article
+            style={
+              styles.summaryCard
+            }
+          >
+            <span
+              style={
+                styles.label
+              }
+            >
+              Permissions
+            </span>
+
+            <strong>
+              {
+                currentUser
+                  .permissions
+                  .length
+              }
             </strong>
           </article>
         </section>
 
-        {!isEmployee && (
-          <section style={styles.card}>
-            <h2 style={styles.sectionHeading}>
-              Dashboard
-            </h2>
+        <section
+          style={
+            styles.card
+          }
+        >
+          <div
+            style={
+              styles.sectionHeader
+            }
+          >
+            <div>
+              <h2
+                style={
+                  styles.sectionHeading
+                }
+              >
+                My Modules
+              </h2>
 
+              <p
+                style={
+                  styles.sectionDescription
+                }
+              >
+                Only modules assigned
+                to your account are
+                available.
+              </p>
+            </div>
+          </div>
+
+          {visibleModules.length ===
+          0 ? (
+            <div
+              style={
+                styles.infoMessage
+              }
+            >
+              No additional modules
+              have been assigned to
+              your account.
+            </div>
+          ) : (
+            <div
+              style={
+                styles.moduleGrid
+              }
+            >
+              {visibleModules.map(
+                module => (
+                  <button
+                    key={
+                      module.permission
+                    }
+                    type="button"
+                    style={
+                      styles.moduleCard
+                    }
+                    onClick={() =>
+                      navigate(
+                        module.path,
+                      )
+                    }
+                  >
+                    <strong
+                      style={
+                        styles.moduleTitle
+                      }
+                    >
+                      {module.title}
+                    </strong>
+
+                    <span
+                      style={
+                        styles
+                          .moduleDescription
+                      }
+                    >
+                      {
+                        module.description
+                      }
+                    </span>
+
+                    <span
+                      style={
+                        styles.moduleAction
+                      }
+                    >
+                      Open module →
+                    </span>
+                  </button>
+                ),
+              )}
+            </div>
+          )}
+        </section>
+
+        {isLoading && (
+          <section
+            style={
+              styles.card
+            }
+          >
             <p>
-              Profile editing is currently
-              available for employee accounts.
+              Loading your
+              employee profile...
             </p>
           </section>
         )}
 
-        {isEmployee && isLoading && (
-          <section style={styles.card}>
-            <p>
-              Loading your employee profile...
-            </p>
-          </section>
-        )}
-
-        {isEmployee &&
-          !isLoading &&
+        {!isLoading &&
           !profile && (
-            <section style={styles.card}>
-              <div style={styles.errorMessage}>
+            <section
+              style={
+                styles.card
+              }
+            >
+              <div
+                style={
+                  styles.errorMessage
+                }
+              >
                 {error ||
                   "No employee profile is linked to this account."}
               </div>
             </section>
           )}
 
-        {isEmployee &&
-          !isLoading &&
+        {!isLoading &&
           profile && (
-            <section style={styles.card}>
-              <div style={styles.sectionHeader}>
+            <section
+              style={
+                styles.card
+              }
+            >
+              <div
+                style={
+                  styles.sectionHeader
+                }
+              >
                 <div>
-                  <h2 style={styles.sectionHeading}>
-                    My details
+                  <h2
+                    style={
+                      styles.sectionHeading
+                    }
+                  >
+                    My Details
                   </h2>
 
-                  <p style={styles.sectionDescription}>
-                    Update your personal details.
-                    Email, role and department can
-                    only be changed by an
-                    administrator.
+                  <p
+                    style={
+                      styles
+                        .sectionDescription
+                    }
+                  >
+                    Update your
+                    personal details.
+                    Email, role and
+                    department can
+                    only be changed
+                    by an administrator.
                   </p>
                 </div>
               </div>
 
               {error && (
-                <div style={styles.errorMessage}>
+                <div
+                  style={
+                    styles.errorMessage
+                  }
+                >
                   {error}
                 </div>
               )}
 
               {success && (
-                <div style={styles.successMessage}>
+                <div
+                  style={
+                    styles.successMessage
+                  }
+                >
                   {success}
                 </div>
               )}
 
-              <form onSubmit={handleSubmit}>
-                <div style={styles.formGrid}>
+              <form
+                onSubmit={
+                  handleSubmit
+                }
+              >
+                <div
+                  style={
+                    styles.formGrid
+                  }
+                >
                   <FormField
                     label="First name"
                     name="firstName"
-                    value={form.firstName}
-                    onChange={handleInputChange}
-                    disabled={isSaving}
+                    value={
+                      form.firstName
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                    disabled={
+                      isSaving
+                    }
                     required
                   />
 
                   <FormField
                     label="Last name"
                     name="lastName"
-                    value={form.lastName}
-                    onChange={handleInputChange}
-                    disabled={isSaving}
+                    value={
+                      form.lastName
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                    disabled={
+                      isSaving
+                    }
                     required
                   />
 
                   <FormField
                     label="Email"
                     name="email"
-                    value={profile.email}
+                    value={
+                      profile.email
+                    }
                     disabled
                   />
 
@@ -597,7 +1046,8 @@ export default function DashboardPage() {
                     label="Department"
                     name="department"
                     value={
-                      profile.departmentName ??
+                      profile
+                        .departmentName ??
                       "Not assigned"
                     }
                     disabled
@@ -606,58 +1056,83 @@ export default function DashboardPage() {
                   <FormField
                     label="Street"
                     name="street"
-                    value={form.street}
-                    onChange={handleInputChange}
-                    disabled={isSaving}
+                    value={
+                      form.street
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                    disabled={
+                      isSaving
+                    }
                   />
 
                   <FormField
                     label="City"
                     name="city"
-                    value={form.city}
-                    onChange={handleInputChange}
-                    disabled={isSaving}
+                    value={
+                      form.city
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                    disabled={
+                      isSaving
+                    }
                   />
 
                   <FormField
                     label="Country"
                     name="country"
-                    value={form.country}
-                    onChange={handleInputChange}
-                    disabled={isSaving}
+                    value={
+                      form.country
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                    disabled={
+                      isSaving
+                    }
                   />
 
                   <FormField
                     label="Postal code"
                     name="postalCode"
-                    value={form.postalCode}
-                    onChange={handleInputChange}
-                    disabled={isSaving}
+                    value={
+                      form.postalCode
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                    disabled={
+                      isSaving
+                    }
                   />
                 </div>
 
-                <div style={styles.actions}>
+                <div
+                  style={
+                    styles.actions
+                  }
+                >
                   <button
                     type="button"
-                    onClick={handleReset}
+                    onClick={
+                      handleReset
+                    }
                     disabled={
                       isSaving ||
                       !profileHasChanged
                     }
                     style={{
-                      ...styles.resetButton,
+                      ...styles
+                        .resetButton,
 
                       opacity:
                         isSaving ||
                         !profileHasChanged
                           ? 0.6
                           : 1,
-
-                      cursor:
-                        isSaving ||
-                        !profileHasChanged
-                          ? "not-allowed"
-                          : "pointer",
                     }}
                   >
                     Cancel changes
@@ -670,19 +1145,14 @@ export default function DashboardPage() {
                       !profileHasChanged
                     }
                     style={{
-                      ...styles.saveButton,
+                      ...styles
+                        .saveButton,
 
                       opacity:
                         isSaving ||
                         !profileHasChanged
                           ? 0.6
                           : 1,
-
-                      cursor:
-                        isSaving ||
-                        !profileHasChanged
-                          ? "not-allowed"
-                          : "pointer",
                     }}
                   >
                     {isSaving
@@ -705,20 +1175,39 @@ function FormField({
   disabled = false,
   required = false,
   onChange,
-}: FormFieldProps) {
+}: FormFieldProps):
+  React.ReactElement {
   return (
-    <label style={styles.field}>
-      <span style={styles.label}>
+    <label
+      style={
+        styles.field
+      }
+    >
+      <span
+        style={
+          styles.label
+        }
+      >
         {label}
       </span>
 
       <input
         type="text"
-        name={name}
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        required={required}
+        name={
+          name
+        }
+        value={
+          value
+        }
+        onChange={
+          onChange
+        }
+        disabled={
+          disabled
+        }
+        required={
+          required
+        }
         style={{
           ...styles.input,
 
@@ -738,88 +1227,119 @@ function FormField({
 }
 
 function createFormFromProfile(
-  employeeProfile: EmployeeProfile,
+  employeeProfile:
+    EmployeeProfile,
 ): ProfileForm {
   return {
     firstName:
-      employeeProfile.firstName ?? "",
+      employeeProfile
+        .firstName ?? "",
 
     lastName:
-      employeeProfile.lastName ?? "",
+      employeeProfile
+        .lastName ?? "",
 
     street:
-      employeeProfile.street ?? "",
+      employeeProfile
+        .street ?? "",
 
     city:
-      employeeProfile.city ?? "",
+      employeeProfile
+        .city ?? "",
 
     country:
-      employeeProfile.country ?? "",
+      employeeProfile
+        .country ?? "",
 
     postalCode:
-      employeeProfile.postalCode ?? "",
+      employeeProfile
+        .postalCode ?? "",
   };
 }
 
 function normalizeProfileForm(
-  profileForm: ProfileForm,
+  profileForm:
+    ProfileForm,
 ): ProfileForm {
   return {
     firstName:
-      profileForm.firstName.trim(),
+      profileForm
+        .firstName
+        .trim(),
 
     lastName:
-      profileForm.lastName.trim(),
+      profileForm
+        .lastName
+        .trim(),
 
     street:
-      profileForm.street.trim(),
+      profileForm
+        .street
+        .trim(),
 
     city:
-      profileForm.city.trim(),
+      profileForm
+        .city
+        .trim(),
 
     country:
-      profileForm.country.trim(),
+      profileForm
+        .country
+        .trim(),
 
     postalCode:
-      profileForm.postalCode.trim(),
+      profileForm
+        .postalCode
+        .trim(),
   };
 }
 
 function hasProfileChanged(
-  currentForm: ProfileForm,
-  savedForm: ProfileForm,
-): boolean {
-  const normalizedCurrentForm =
-    normalizeProfileForm(currentForm);
+  currentForm:
+    ProfileForm,
 
-  const normalizedSavedForm =
-    normalizeProfileForm(savedForm);
+  savedForm:
+    ProfileForm,
+): boolean {
+  const current =
+    normalizeProfileForm(
+      currentForm,
+    );
+
+  const saved =
+    normalizeProfileForm(
+      savedForm,
+    );
 
   return (
-    normalizedCurrentForm.firstName !==
-      normalizedSavedForm.firstName ||
+    current.firstName !==
+      saved.firstName ||
 
-    normalizedCurrentForm.lastName !==
-      normalizedSavedForm.lastName ||
+    current.lastName !==
+      saved.lastName ||
 
-    normalizedCurrentForm.street !==
-      normalizedSavedForm.street ||
+    current.street !==
+      saved.street ||
 
-    normalizedCurrentForm.city !==
-      normalizedSavedForm.city ||
+    current.city !==
+      saved.city ||
 
-    normalizedCurrentForm.country !==
-      normalizedSavedForm.country ||
+    current.country !==
+      saved.country ||
 
-    normalizedCurrentForm.postalCode !==
-      normalizedSavedForm.postalCode
+    current.postalCode !==
+      saved.postalCode
   );
 }
 
 async function readResponseBody(
-  response: Response,
+  response:
+    Response,
 ): Promise<unknown> {
-  if (response.status === 204) {
+  if (
+    response.status ===
+    204
+  ) {
     return {};
   }
 
@@ -841,208 +1361,500 @@ async function readResponseBody(
 
   return text
     ? {
-        message: text,
+        message:
+          text,
       }
     : {};
 }
 
 function getErrorMessage(
-  responseBody: unknown,
-  fallbackMessage: string,
+  responseBody:
+    unknown,
+
+  fallbackMessage:
+    string,
 ): string {
   if (
-    typeof responseBody !== "object" ||
-    responseBody === null
+    typeof responseBody !==
+      "object" ||
+    responseBody ===
+      null
   ) {
     return fallbackMessage;
   }
 
-  const error =
+  const apiError =
     responseBody as ApiError;
 
   if (
-    typeof error.message === "string" &&
-    error.message.trim()
+    typeof apiError.message ===
+      "string" &&
+    apiError.message.trim()
   ) {
-    return error.message;
+    return apiError.message;
   }
 
   if (
-    Array.isArray(error.errors) &&
-    error.errors.length > 0
+    Array.isArray(
+      apiError.errors,
+    ) &&
+    apiError.errors.length >
+      0
   ) {
-    return error.errors.join(" ");
+    return apiError.errors.join(
+      " ",
+    );
+  }
+
+  if (
+    apiError.errors &&
+    !Array.isArray(
+      apiError.errors,
+    )
+  ) {
+    const validationMessages =
+      Object.values(
+        apiError.errors,
+      ).flat();
+
+    if (
+      validationMessages.length >
+      0
+    ) {
+      return validationMessages.join(
+        " ",
+      );
+    }
+  }
+
+  if (
+    typeof apiError.title ===
+      "string" &&
+    apiError.title.trim()
+  ) {
+    return apiError.title;
   }
 
   return fallbackMessage;
 }
 
-function clearAuthentication(): void {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+function clearAuthentication():
+  void {
+  localStorage.removeItem(
+    TOKEN_KEY,
+  );
+
+  localStorage.removeItem(
+    USER_KEY,
+  );
 }
 
-const styles: Record<
-  string,
-  CSSProperties
-> = {
+const styles:
+  Record<
+    string,
+    CSSProperties
+  > = {
   page: {
-    minHeight: "100vh",
-    background: "#f4f6f8",
-    padding: "40px 20px",
+    minHeight:
+      "100vh",
+
+    background:
+      "#f4f6f8",
+
+    padding:
+      "40px 20px",
   },
 
   dashboard: {
-    width: "100%",
-    maxWidth: 1000,
-    margin: "0 auto",
+    width:
+      "100%",
+
+    maxWidth:
+      1100,
+
+    margin:
+      "0 auto",
   },
 
   header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 20,
-    marginBottom: 24,
+    display:
+      "flex",
+
+    justifyContent:
+      "space-between",
+
+    alignItems:
+      "flex-start",
+
+    gap:
+      20,
+
+    marginBottom:
+      24,
   },
 
   eyebrow: {
-    color: "#667085",
-    fontSize: 14,
-    margin: "0 0 8px",
+    color:
+      "#667085",
+
+    fontSize:
+      14,
+
+    margin:
+      "0 0 8px",
   },
 
   heading: {
-    margin: "0 0 8px",
-    color: "#101828",
+    margin:
+      "0 0 8px",
+
+    color:
+      "#101828",
   },
 
   subtitle: {
-    margin: 0,
-    color: "#667085",
+    margin:
+      0,
+
+    color:
+      "#667085",
   },
 
   logoutButton: {
-    border: "1px solid #d0d5dd",
-    borderRadius: 8,
-    background: "#ffffff",
-    padding: "10px 18px",
-    cursor: "pointer",
+    border:
+      "1px solid #d0d5dd",
+
+    borderRadius:
+      8,
+
+    background:
+      "#ffffff",
+
+    padding:
+      "10px 18px",
+
+    cursor:
+      "pointer",
   },
 
   summaryGrid: {
-    display: "grid",
+    display:
+      "grid",
+
     gridTemplateColumns:
       "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: 16,
-    marginBottom: 24,
+
+    gap:
+      16,
+
+    marginBottom:
+      24,
   },
 
   summaryCard: {
-    background: "#ffffff",
-    borderRadius: 10,
-    padding: 20,
+    background:
+      "#ffffff",
+
+    borderRadius:
+      10,
+
+    padding:
+      20,
+
     boxShadow:
       "0 1px 4px rgba(16,24,40,0.08)",
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
+
+    display:
+      "flex",
+
+    flexDirection:
+      "column",
+
+    gap:
+      8,
   },
 
   card: {
-    background: "#ffffff",
-    borderRadius: 12,
-    padding: 28,
+    background:
+      "#ffffff",
+
+    borderRadius:
+      12,
+
+    padding:
+      28,
+
     boxShadow:
       "0 2px 10px rgba(16,24,40,0.08)",
+
+    marginBottom:
+      24,
+  },
+
+  moduleGrid: {
+    display:
+      "grid",
+
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(220px, 1fr))",
+
+    gap:
+      16,
+  },
+
+  moduleCard: {
+    display:
+      "flex",
+
+    flexDirection:
+      "column",
+
+    alignItems:
+      "flex-start",
+
+    textAlign:
+      "left",
+
+    gap:
+      10,
+
+    background:
+      "#ffffff",
+
+    border:
+      "1px solid #e4e7ec",
+
+    borderRadius:
+      10,
+
+    padding:
+      20,
+
+    cursor:
+      "pointer",
+  },
+
+  moduleTitle: {
+    color:
+      "#101828",
+
+    fontSize:
+      17,
+  },
+
+  moduleDescription: {
+    color:
+      "#667085",
+
+    fontSize:
+      14,
+
+    lineHeight:
+      1.5,
+  },
+
+  moduleAction: {
+    color:
+      "#2563eb",
+
+    fontWeight:
+      600,
+
+    fontSize:
+      14,
+  },
+
+  infoMessage: {
+    background:
+      "#f2f4f7",
+
+    color:
+      "#475467",
+
+    borderRadius:
+      8,
+
+    padding:
+      14,
   },
 
   sectionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: 24,
+    display:
+      "flex",
+
+    justifyContent:
+      "space-between",
+
+    marginBottom:
+      24,
   },
 
   sectionHeading: {
-    margin: "0 0 6px",
-    color: "#101828",
+    margin:
+      "0 0 6px",
+
+    color:
+      "#101828",
   },
 
   sectionDescription: {
-    margin: 0,
-    color: "#667085",
+    margin:
+      0,
+
+    color:
+      "#667085",
   },
 
   formGrid: {
-    display: "grid",
+    display:
+      "grid",
+
     gridTemplateColumns:
       "repeat(auto-fit, minmax(250px, 1fr))",
-    gap: 20,
+
+    gap:
+      20,
   },
 
   field: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
+    display:
+      "flex",
+
+    flexDirection:
+      "column",
+
+    gap:
+      8,
   },
 
   label: {
-    color: "#475467",
-    fontSize: 14,
-    fontWeight: 500,
+    color:
+      "#475467",
+
+    fontSize:
+      14,
+
+    fontWeight:
+      500,
   },
 
   input: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid #d0d5dd",
-    borderRadius: 8,
-    padding: "11px 12px",
-    fontSize: 15,
+    width:
+      "100%",
+
+    boxSizing:
+      "border-box",
+
+    border:
+      "1px solid #d0d5dd",
+
+    borderRadius:
+      8,
+
+    padding:
+      "11px 12px",
+
+    fontSize:
+      15,
   },
 
   actions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: 12,
-    marginTop: 24,
+    display:
+      "flex",
+
+    justifyContent:
+      "flex-end",
+
+    gap:
+      12,
+
+    marginTop:
+      24,
   },
 
   resetButton: {
-    border: "1px solid #d0d5dd",
-    borderRadius: 8,
-    background: "#ffffff",
-    color: "#344054",
-    padding: "11px 22px",
-    fontSize: 15,
-    fontWeight: 600,
+    border:
+      "1px solid #d0d5dd",
+
+    borderRadius:
+      8,
+
+    background:
+      "#ffffff",
+
+    color:
+      "#344054",
+
+    padding:
+      "11px 22px",
+
+    fontSize:
+      15,
+
+    fontWeight:
+      600,
   },
 
   saveButton: {
-    border: 0,
-    borderRadius: 8,
-    background: "#2563eb",
-    color: "#ffffff",
-    padding: "11px 22px",
-    fontSize: 15,
-    fontWeight: 600,
+    border:
+      0,
+
+    borderRadius:
+      8,
+
+    background:
+      "#2563eb",
+
+    color:
+      "#ffffff",
+
+    padding:
+      "11px 22px",
+
+    fontSize:
+      15,
+
+    fontWeight:
+      600,
   },
 
   errorMessage: {
-    background: "#fef3f2",
-    color: "#b42318",
-    border: "1px solid #fecdca",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
+    background:
+      "#fef3f2",
+
+    color:
+      "#b42318",
+
+    border:
+      "1px solid #fecdca",
+
+    borderRadius:
+      8,
+
+    padding:
+      12,
+
+    marginBottom:
+      20,
   },
 
   successMessage: {
-    background: "#ecfdf3",
-    color: "#027a48",
-    border: "1px solid #abefc6",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
+    background:
+      "#ecfdf3",
+
+    color:
+      "#027a48",
+
+    border:
+      "1px solid #abefc6",
+
+    borderRadius:
+      8,
+
+    padding:
+      12,
+
+    marginBottom:
+      20,
   },
 };

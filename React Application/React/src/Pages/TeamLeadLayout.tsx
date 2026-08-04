@@ -15,6 +15,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
 import PersonIcon from "@mui/icons-material/Person";
 import WorkIcon from "@mui/icons-material/Work";
+import SecurityIcon from "@mui/icons-material/Security";
 
 import {
   AppBar,
@@ -66,6 +67,11 @@ const navigationItems: NavigationItem[] = [
     label: "Projects",
     path: "/team-lead/projects",
     icon: <WorkIcon />,
+  },
+  {
+    label: "Permissions",
+    path: "/team-lead/permissions",
+    icon: <SecurityIcon />,
   },
   {
     label: "My Profile",
