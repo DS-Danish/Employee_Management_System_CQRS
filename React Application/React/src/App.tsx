@@ -10,6 +10,10 @@ import {
   AppPermissions,
 } from "./Constants/permissions";
 
+import {
+  EmployeeLayout,
+} from "./Pages/EmployeeLayout";
+
 import CreateUserPage from "./Pages/CreateUserPage";
 import DashboardPage from "./Pages/DashboardPage";
 import DepartmentsPage from "./Pages/DepartmentsPage";
@@ -67,81 +71,108 @@ React.ReactElement {
         }
       >
         <Route
-          path="/employee/dashboard"
+          path="/employee"
           element={
-            <DashboardPage />
+            <EmployeeLayout />
           }
-        />
-
-        <Route
-          path="/employee/leaves"
-          element={
-            <MyLeavesPage />
-          }
-        />
-      </Route>
-
-      <Route
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "Employee",
-            ]}
-            requiredPermissions={[
-              AppPermissions
-                .ViewEmployees,
-            ]}
+        >
+          <Route
+            index
+            element={
+              <Navigate
+                to="dashboard"
+                replace
+              />
+            }
           />
-        }
-      >
-        <Route
-          path="/employee/employees"
-          element={
-            <EmployeesPage />
-          }
-        />
-      </Route>
 
-      <Route
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "Employee",
-            ]}
-            requiredPermissions={[
-              AppPermissions
-                .ViewDepartments,
-            ]}
-          />
-        }
-      >
-        <Route
-          path="/employee/departments"
-          element={
-            <DepartmentsPage />
-          }
-        />
-      </Route>
+          {/* DASHBOARD */}
 
-      <Route
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "Employee",
-            ]}
-            requiredPermissions={[
-              AppPermissions
-                .ViewProjects,
-            ]}
+          <Route
+            path="dashboard"
+            element={
+              <DashboardPage />
+            }
           />
-        }
-      >
-        <Route
-          path="/employee/projects"
-          element={
-            <ProjectsPage />
-          }
-        />
+
+          {/* LEAVES */}
+
+          <Route
+            path="leaves"
+            element={
+              <MyLeavesPage />
+            }
+          />
+
+          {/* PROFILE */}
+
+          <Route
+            path="profile"
+            element={
+              <EmployeeProfilePage />
+            }
+          />
+
+          {/* EMPLOYEES */}
+
+          <Route
+            element={
+              <ProtectedRoute
+                requiredPermissions={[
+                  AppPermissions
+                    .ViewEmployees,
+                ]}
+              />
+            }
+          >
+            <Route
+              path="employees"
+              element={
+                <EmployeesPage />
+              }
+            />
+          </Route>
+
+          {/* DEPARTMENTS */}
+
+          <Route
+            element={
+              <ProtectedRoute
+                requiredPermissions={[
+                  AppPermissions
+                    .ViewDepartments,
+                ]}
+              />
+            }
+          >
+            <Route
+              path="departments"
+              element={
+                <DepartmentsPage />
+              }
+            />
+          </Route>
+
+          {/* PROJECTS */}
+
+          <Route
+            element={
+              <ProtectedRoute
+                requiredPermissions={[
+                  AppPermissions
+                    .ViewProjects,
+                ]}
+              />
+            }
+          >
+            <Route
+              path="projects"
+              element={
+                <ProjectsPage />
+              }
+            />
+          </Route>
+        </Route>
       </Route>
 
       {/* =========================

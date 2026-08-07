@@ -10,12 +10,14 @@ import {
 } from "react-router-dom";
 
 import DashboardIcon from "@mui/icons-material/Dashboard";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import GroupsIcon from "@mui/icons-material/Groups";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
+import PendingActionsIcon from "@mui/icons-material/PendingActions";
 import PersonIcon from "@mui/icons-material/Person";
-import WorkIcon from "@mui/icons-material/Work";
 import SecurityIcon from "@mui/icons-material/Security";
+import WorkIcon from "@mui/icons-material/Work";
 
 import {
   AppBar,
@@ -62,6 +64,16 @@ const navigationItems: NavigationItem[] = [
     label: "Manage Employees",
     path: "/team-lead/employees",
     icon: <GroupsIcon />,
+  },
+  {
+    label: "My Leaves",
+    path: "/team-lead/leaves",
+    icon: <EventAvailableIcon />,
+  },
+  {
+    label: "Leave Requests",
+    path: "/team-lead/leave-requests",
+    icon: <PendingActionsIcon />,
   },
   {
     label: "Projects",
@@ -118,11 +130,14 @@ function getInitials(
 
   return (
     nameParts[0][0] +
-    nameParts[nameParts.length - 1][0]
+    nameParts[
+      nameParts.length - 1
+    ][0]
   ).toUpperCase();
 }
 
-export function TeamLeadLayout(): React.ReactElement {
+export function TeamLeadLayout():
+React.ReactElement {
   const theme = useTheme();
 
   const isDesktop: boolean =
@@ -132,7 +147,10 @@ export function TeamLeadLayout(): React.ReactElement {
 
   const navigate = useNavigate();
 
-  const [mobileDrawerOpen, setMobileDrawerOpen] =
+  const [
+    mobileDrawerOpen,
+    setMobileDrawerOpen,
+  ] =
     useState<boolean>(false);
 
   const currentUser: StoredUser =
@@ -140,43 +158,61 @@ export function TeamLeadLayout(): React.ReactElement {
 
   function handleDrawerToggle(): void {
     setMobileDrawerOpen(
-      (previousValue: boolean) =>
+      (
+        previousValue:
+          boolean,
+      ) =>
         !previousValue,
     );
   }
 
   function handleNavigation(): void {
     if (!isDesktop) {
-      setMobileDrawerOpen(false);
+      setMobileDrawerOpen(
+        false,
+      );
     }
   }
 
   function handleLogout(): void {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("authUser");
+    localStorage.removeItem(
+      "authToken",
+    );
 
-    navigate("/login", {
-      replace: true,
-    });
+    localStorage.removeItem(
+      "authUser",
+    );
+
+    navigate(
+      "/login",
+      {
+        replace: true,
+      },
+    );
   }
 
-  const drawerContent = (
+  const drawerContent:
+    React.ReactElement = (
     <Box
       sx={{
         height: "100%",
         display: "flex",
-        flexDirection: "column",
+        flexDirection:
+          "column",
         bgcolor: "#111827",
         color: "#FFFFFF",
       }}
     >
+      {/* HEADER */}
+
       <Box
         sx={{
           minHeight: 72,
           px: 2.5,
           py: 2,
           display: "flex",
-          alignItems: "center",
+          alignItems:
+            "center",
           gap: 1.5,
         }}
       >
@@ -184,14 +220,19 @@ export function TeamLeadLayout(): React.ReactElement {
           sx={{
             width: 42,
             height: 42,
-            bgcolor: "primary.main",
+            bgcolor:
+              "primary.main",
             fontWeight: 700,
           }}
         >
           EMS
         </Avatar>
 
-        <Box sx={{ minWidth: 0 }}>
+        <Box
+          sx={{
+            minWidth: 0,
+          }}
+        >
           <Typography
             variant="subtitle1"
             sx={{
@@ -221,6 +262,8 @@ export function TeamLeadLayout(): React.ReactElement {
         }}
       />
 
+      {/* NAVIGATION */}
+
       <List
         component="nav"
         sx={{
@@ -229,34 +272,48 @@ export function TeamLeadLayout(): React.ReactElement {
         }}
       >
         {navigationItems.map(
-          (item: NavigationItem) => (
+          (
+            item:
+              NavigationItem,
+          ) => (
             <ListItemButton
               key={item.path}
-              component={NavLink}
+              component={
+                NavLink
+              }
               to={item.path}
               end={item.end}
-              onClick={handleNavigation}
+              onClick={
+                handleNavigation
+              }
               sx={{
                 mb: 0.75,
                 px: 1.5,
                 py: 1.15,
                 borderRadius: 2,
+
                 color:
                   "rgba(255,255,255,0.72)",
 
-                "& .MuiListItemIcon-root": {
-                  minWidth: 40,
-                  color: "inherit",
-                },
+                "& .MuiListItemIcon-root":
+                  {
+                    minWidth: 40,
+                    color:
+                      "inherit",
+                  },
 
                 "&:hover": {
                   bgcolor:
                     "rgba(255,255,255,0.08)",
-                  color: "#FFFFFF",
+
+                  color:
+                    "#FFFFFF",
                 },
 
                 "&.active": {
-                  bgcolor: "primary.main",
+                  bgcolor:
+                    "primary.main",
+
                   color:
                     "primary.contrastText",
                 },
@@ -267,22 +324,31 @@ export function TeamLeadLayout(): React.ReactElement {
               </ListItemIcon>
 
               <ListItemText
-                  primary={item.label}
-                  slotProps={{
-                    primary: {
-                      sx: {
-                        fontSize: 14,
-                        fontWeight: 600,
-                      },
+                primary={
+                  item.label
+                }
+                slotProps={{
+                  primary: {
+                    sx: {
+                      fontSize:
+                        14,
+
+                      fontWeight:
+                        600,
                     },
-                  }}
-                />
+                  },
+                }}
+              />
             </ListItemButton>
           ),
         )}
       </List>
 
-      <Box sx={{ flexGrow: 1 }} />
+      <Box
+        sx={{
+          flexGrow: 1,
+        }}
+      />
 
       <Divider
         sx={{
@@ -291,11 +357,18 @@ export function TeamLeadLayout(): React.ReactElement {
         }}
       />
 
-      <Box sx={{ p: 2 }}>
+      {/* USER / LOGOUT */}
+
+      <Box
+        sx={{
+          p: 2,
+        }}
+      >
         <Box
           sx={{
             display: "flex",
-            alignItems: "center",
+            alignItems:
+              "center",
             gap: 1.25,
             px: 1,
             mb: 1.5,
@@ -305,14 +378,17 @@ export function TeamLeadLayout(): React.ReactElement {
             sx={{
               width: 38,
               height: 38,
+
               bgcolor:
                 "rgba(255,255,255,0.14)",
+
               fontSize: 14,
               fontWeight: 700,
             }}
           >
             {getInitials(
-              currentUser.fullName,
+              currentUser
+                .fullName,
             )}
           </Avatar>
 
@@ -326,11 +402,15 @@ export function TeamLeadLayout(): React.ReactElement {
               variant="body2"
               noWrap
               sx={{
-                color: "#FFFFFF",
-                fontWeight: 600,
+                color:
+                  "#FFFFFF",
+
+                fontWeight:
+                  600,
               }}
             >
-              {currentUser.fullName ??
+              {currentUser
+                .fullName ??
                 "Team Lead"}
             </Typography>
 
@@ -338,12 +418,15 @@ export function TeamLeadLayout(): React.ReactElement {
               variant="caption"
               noWrap
               sx={{
-                display: "block",
+                display:
+                  "block",
+
                 color:
                   "rgba(255,255,255,0.60)",
               }}
             >
-              {currentUser.email ?? ""}
+              {currentUser
+                .email ?? ""}
             </Typography>
           </Box>
         </Box>
@@ -352,18 +435,28 @@ export function TeamLeadLayout(): React.ReactElement {
           type="button"
           fullWidth
           variant="outlined"
-          startIcon={<LogoutIcon />}
-          onClick={handleLogout}
+          startIcon={
+            <LogoutIcon />
+          }
+          onClick={
+            handleLogout
+          }
           sx={{
             borderColor:
               "rgba(255,255,255,0.22)",
-            color: "#FFFFFF",
+
+            color:
+              "#FFFFFF",
+
             borderRadius: 2,
-            textTransform: "none",
+
+            textTransform:
+              "none",
 
             "&:hover": {
               borderColor:
                 "rgba(255,255,255,0.45)",
+
               bgcolor:
                 "rgba(255,255,255,0.08)",
             },
@@ -383,6 +476,8 @@ export function TeamLeadLayout(): React.ReactElement {
         bgcolor: "#F8FAFC",
       }}
     >
+      {/* MOBILE APP BAR */}
+
       <AppBar
         position="fixed"
         elevation={0}
@@ -391,10 +486,18 @@ export function TeamLeadLayout(): React.ReactElement {
             xs: "block",
             md: "none",
           },
-          bgcolor: "background.paper",
-          color: "text.primary",
-          borderBottom: "1px solid",
-          borderColor: "divider",
+
+          bgcolor:
+            "background.paper",
+
+          color:
+            "text.primary",
+
+          borderBottom:
+            "1px solid",
+
+          borderColor:
+            "divider",
         }}
       >
         <Toolbar>
@@ -402,8 +505,12 @@ export function TeamLeadLayout(): React.ReactElement {
             type="button"
             edge="start"
             aria-label="Open navigation"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 1 }}
+            onClick={
+              handleDrawerToggle
+            }
+            sx={{
+              mr: 1,
+            }}
           >
             <MenuIcon />
           </IconButton>
@@ -420,7 +527,8 @@ export function TeamLeadLayout(): React.ReactElement {
 
           <Tooltip
             title={
-              currentUser.fullName ??
+              currentUser
+                .fullName ??
               "Team Lead"
             }
           >
@@ -428,18 +536,24 @@ export function TeamLeadLayout(): React.ReactElement {
               sx={{
                 width: 36,
                 height: 36,
-                bgcolor: "primary.main",
+
+                bgcolor:
+                  "primary.main",
+
                 fontSize: 13,
                 fontWeight: 700,
               }}
             >
               {getInitials(
-                currentUser.fullName,
+                currentUser
+                  .fullName,
               )}
             </Avatar>
           </Tooltip>
         </Toolbar>
       </AppBar>
+
+      {/* DRAWER */}
 
       <Box
         component="nav"
@@ -448,6 +562,7 @@ export function TeamLeadLayout(): React.ReactElement {
           width: {
             md: DRAWER_WIDTH,
           },
+
           flexShrink: {
             md: 0,
           },
@@ -455,19 +570,28 @@ export function TeamLeadLayout(): React.ReactElement {
       >
         <Drawer
           variant="temporary"
-          open={mobileDrawerOpen}
-          onClose={handleDrawerToggle}
+          open={
+            mobileDrawerOpen
+          }
+          onClose={
+            handleDrawerToggle
+          }
           sx={{
             display: {
               xs: "block",
               md: "none",
             },
 
-            "& .MuiDrawer-paper": {
-              width: DRAWER_WIDTH,
-              boxSizing: "border-box",
-              border: 0,
-            },
+            "& .MuiDrawer-paper":
+              {
+                width:
+                  DRAWER_WIDTH,
+
+                boxSizing:
+                  "border-box",
+
+                border: 0,
+              },
           }}
         >
           {drawerContent}
@@ -482,22 +606,30 @@ export function TeamLeadLayout(): React.ReactElement {
               md: "block",
             },
 
-            "& .MuiDrawer-paper": {
-              width: DRAWER_WIDTH,
-              boxSizing: "border-box",
-              border: 0,
-            },
+            "& .MuiDrawer-paper":
+              {
+                width:
+                  DRAWER_WIDTH,
+
+                boxSizing:
+                  "border-box",
+
+                border: 0,
+              },
           }}
         >
           {drawerContent}
         </Drawer>
       </Box>
 
+      {/* CONTENT */}
+
       <Box
         component="main"
         sx={{
           flexGrow: 1,
           minWidth: 0,
+
           pt: {
             xs: "64px",
             md: 0,
