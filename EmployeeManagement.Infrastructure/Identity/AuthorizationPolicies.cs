@@ -22,4 +22,16 @@ public static class AuthorizationPolicies
 
     public const string ManageProjects =
         "ManageProjects";
+
+    public const string ViewTeamLeaves =
+        "ViewTeamLeaves";
+
+    public const string ReviewTeamLeaves =
+        "ReviewTeamLeaves";
+
+    public const string ViewAllLeaves =
+        "ViewAllLeaves";
+
+    public const string ManageLeavePolicies =
+        "ManageLeavePolicies";
 }

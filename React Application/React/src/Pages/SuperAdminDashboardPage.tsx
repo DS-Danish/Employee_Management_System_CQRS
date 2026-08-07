@@ -7,6 +7,7 @@ import {
 
 import ApartmentIcon from "@mui/icons-material/Apartment";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -48,6 +49,10 @@ import {
   getProjects,
 } from "../services/projectService";
 
+import {
+  getPendingLeaves,
+} from "../services/leaveService";
+
 import type {
   StoredUser,
 } from "../Types/auth";
@@ -56,6 +61,7 @@ interface DashboardStatistics {
   employees: number;
   departments: number;
   projects: number;
+  pendingLeaves: number;
 }
 
 interface SummaryCardProps {
@@ -74,28 +80,33 @@ interface ManagementCardProps {
 }
 
 export default function SuperAdminDashboardPage():
-  React.ReactElement {
-  const currentUser: StoredUser | null =
+React.ReactElement {
+  const currentUser:
+    StoredUser | null =
     getStoredUser();
 
   const [
     statistics,
     setStatistics,
-  ] = useState<DashboardStatistics>({
-    employees: 0,
-    departments: 0,
-    projects: 0,
-  });
+  ] =
+    useState<DashboardStatistics>({
+      employees: 0,
+      departments: 0,
+      projects: 0,
+      pendingLeaves: 0,
+    });
 
   const [
     loading,
     setLoading,
-  ] = useState<boolean>(true);
+  ] =
+    useState<boolean>(true);
 
   const [
     error,
     setError,
-  ] = useState<string>("");
+  ] =
+    useState<string>("");
 
   const loadDashboard =
     useCallback(
@@ -108,31 +119,44 @@ export default function SuperAdminDashboardPage():
             employees,
             departments,
             projects,
-          ] = await Promise.all([
-            getEmployees(),
-            getDepartments(),
-            getProjects(),
-          ]);
+            pendingLeaves,
+          ] =
+            await Promise.all([
+              getEmployees(),
+              getDepartments(),
+              getProjects(),
+              getPendingLeaves(),
+            ]);
 
           setStatistics({
             employees:
               employees.length,
+
             departments:
               departments.length,
+
             projects:
               projects.length,
+
+            pendingLeaves:
+              pendingLeaves.length,
           });
         } catch (
           caughtError: unknown
         ) {
-          const message: string =
+          const message:
+            string =
             caughtError instanceof Error
               ? caughtError.message
               : "Unable to load dashboard information.";
 
-          setError(message);
+          setError(
+            message,
+          );
         } finally {
-          setLoading(false);
+          setLoading(
+            false,
+          );
         }
       },
       [],
@@ -159,6 +183,10 @@ export default function SuperAdminDashboardPage():
         }}
       >
         <Stack spacing={4}>
+          {/* =====================
+              HEADER
+              ===================== */}
+
           <Paper
             elevation={0}
             sx={{
@@ -166,25 +194,33 @@ export default function SuperAdminDashboardPage():
                 xs: 3,
                 md: 4,
               },
+
               borderRadius: 3,
+
               background:
                 "linear-gradient(135deg, #1976d2 0%, #512da8 100%)",
-              color: "common.white",
+
+              color:
+                "common.white",
             }}
           >
             <Box
               sx={{
                 display: "flex",
+
                 justifyContent:
                   "space-between",
+
                 alignItems: {
                   xs: "flex-start",
                   sm: "center",
                 },
+
                 flexDirection: {
                   xs: "column",
                   sm: "row",
                 },
+
                 gap: 2,
               }}
             >
@@ -219,24 +255,30 @@ export default function SuperAdminDashboardPage():
                 >
                   Welcome back,{" "}
                   {currentUser?.fullName ??
-                    "Super Admin"}
-                  . Manage employees,
+                    "Super Admin"}.
+                  Manage employees,
                   departments, projects,
-                  user access and permissions
-                  from one place.
+                  leave requests, user access
+                  and permissions from one
+                  place.
                 </Typography>
               </Box>
 
-              <Tooltip title="Refresh dashboard">
+              <Tooltip
+                title="Refresh dashboard"
+              >
                 <span>
                   <IconButton
-                    disabled={loading}
+                    disabled={
+                      loading
+                    }
                     onClick={() =>
                       void loadDashboard()
                     }
                     sx={{
                       bgcolor:
                         "rgba(255,255,255,0.12)",
+
                       color:
                         "common.white",
 
@@ -274,6 +316,10 @@ export default function SuperAdminDashboardPage():
             </Alert>
           )}
 
+          {/* =====================
+              OVERVIEW
+              ===================== */}
+
           <Box>
             <Typography
               variant="h5"
@@ -303,7 +349,7 @@ export default function SuperAdminDashboardPage():
               size={{
                 xs: 12,
                 sm: 6,
-                lg: 4,
+                lg: 3,
               }}
             >
               <SummaryCard
@@ -312,7 +358,9 @@ export default function SuperAdminDashboardPage():
                   statistics.employees
                 }
                 loading={loading}
-                icon={<GroupsIcon />}
+                icon={
+                  <GroupsIcon />
+                }
               />
             </Grid>
 
@@ -320,7 +368,7 @@ export default function SuperAdminDashboardPage():
               size={{
                 xs: 12,
                 sm: 6,
-                lg: 4,
+                lg: 3,
               }}
             >
               <SummaryCard
@@ -329,7 +377,9 @@ export default function SuperAdminDashboardPage():
                   statistics.departments
                 }
                 loading={loading}
-                icon={<ApartmentIcon />}
+                icon={
+                  <ApartmentIcon />
+                }
               />
             </Grid>
 
@@ -337,7 +387,7 @@ export default function SuperAdminDashboardPage():
               size={{
                 xs: 12,
                 sm: 6,
-                lg: 4,
+                lg: 3,
               }}
             >
               <SummaryCard
@@ -346,10 +396,35 @@ export default function SuperAdminDashboardPage():
                   statistics.projects
                 }
                 loading={loading}
-                icon={<WorkIcon />}
+                icon={
+                  <WorkIcon />
+                }
+              />
+            </Grid>
+
+            <Grid
+              size={{
+                xs: 12,
+                sm: 6,
+                lg: 3,
+              }}
+            >
+              <SummaryCard
+                title="Pending Leaves"
+                value={
+                  statistics.pendingLeaves
+                }
+                loading={loading}
+                icon={
+                  <EventAvailableIcon />
+                }
               />
             </Grid>
           </Grid>
+
+          {/* =====================
+              ADMINISTRATION
+              ===================== */}
 
           <Box>
             <Typography
@@ -380,7 +455,7 @@ export default function SuperAdminDashboardPage():
               size={{
                 xs: 12,
                 sm: 6,
-                lg: 3,
+                lg: 4,
               }}
             >
               <ManagementCard
@@ -388,7 +463,9 @@ export default function SuperAdminDashboardPage():
                 description="Create, view, update and delete employee records."
                 buttonLabel="Manage employees"
                 path="/super-admin/employees"
-                icon={<GroupsIcon />}
+                icon={
+                  <GroupsIcon />
+                }
               />
             </Grid>
 
@@ -396,7 +473,7 @@ export default function SuperAdminDashboardPage():
               size={{
                 xs: 12,
                 sm: 6,
-                lg: 3,
+                lg: 4,
               }}
             >
               <ManagementCard
@@ -414,7 +491,7 @@ export default function SuperAdminDashboardPage():
               size={{
                 xs: 12,
                 sm: 6,
-                lg: 3,
+                lg: 4,
               }}
             >
               <ManagementCard
@@ -422,7 +499,9 @@ export default function SuperAdminDashboardPage():
                 description="Manage projects and employee project assignments."
                 buttonLabel="Manage projects"
                 path="/super-admin/projects"
-                icon={<WorkIcon />}
+                icon={
+                  <WorkIcon />
+                }
               />
             </Grid>
 
@@ -430,7 +509,25 @@ export default function SuperAdminDashboardPage():
               size={{
                 xs: 12,
                 sm: 6,
-                lg: 3,
+                lg: 4,
+              }}
+            >
+              <ManagementCard
+                title="Leave Requests"
+                description="Review pending leave applications from employees and team leads."
+                buttonLabel="Review leave requests"
+                path="/super-admin/leave-requests"
+                icon={
+                  <EventAvailableIcon />
+                }
+              />
+            </Grid>
+
+            <Grid
+              size={{
+                xs: 12,
+                sm: 6,
+                lg: 4,
               }}
             >
               <ManagementCard
@@ -448,7 +545,7 @@ export default function SuperAdminDashboardPage():
               size={{
                 xs: 12,
                 sm: 6,
-                lg: 3,
+                lg: 4,
               }}
             >
               <ManagementCard
@@ -456,18 +553,27 @@ export default function SuperAdminDashboardPage():
                 description="Assign application permissions to employees and team leads."
                 buttonLabel="Manage permissions"
                 path="/super-admin/permissions"
-                icon={<SecurityIcon />}
+                icon={
+                  <SecurityIcon />
+                }
               />
             </Grid>
           </Grid>
+
+          {/* =====================
+              ACCOUNT INFORMATION
+              ===================== */}
 
           <Paper
             elevation={0}
             sx={{
               p: 3,
               borderRadius: 3,
-              border: "1px solid",
-              borderColor: "divider",
+              border:
+                "1px solid",
+
+              borderColor:
+                "divider",
             }}
           >
             <Typography
@@ -567,14 +673,16 @@ function SummaryCard({
   value,
   loading,
   icon,
-}: SummaryCardProps): React.ReactElement {
+}: SummaryCardProps):
+React.ReactElement {
   return (
     <Card
       sx={{
         height: "100%",
         borderRadius: 3,
         border: 1,
-        borderColor: "divider",
+        borderColor:
+          "divider",
         boxShadow: "none",
       }}
     >
@@ -582,7 +690,8 @@ function SummaryCard({
         sx={{
           p: 3,
           display: "flex",
-          alignItems: "center",
+          alignItems:
+            "center",
           gap: 2,
         }}
       >
@@ -631,8 +740,10 @@ function ManagementCard({
   buttonLabel,
   path,
   icon,
-}: ManagementCardProps): React.ReactElement {
-  const navigate = useNavigate();
+}: ManagementCardProps):
+React.ReactElement {
+  const navigate =
+    useNavigate();
 
   return (
     <Card
@@ -640,14 +751,17 @@ function ManagementCard({
         height: "100%",
         borderRadius: 3,
         border: 1,
-        borderColor: "divider",
+        borderColor:
+          "divider",
         boxShadow: "none",
+
         transition:
           "transform 0.2s ease, box-shadow 0.2s ease",
 
         "&:hover": {
           transform:
             "translateY(-3px)",
+
           boxShadow: 3,
         },
       }}
@@ -664,7 +778,10 @@ function ManagementCard({
           sx={{
             p: 3,
             height: "100%",
-            display: "flex",
+
+            display:
+              "flex",
+
             flexDirection:
               "column",
           }}
@@ -673,6 +790,7 @@ function ManagementCard({
             sx={{
               bgcolor:
                 "primary.main",
+
               mb: 2,
             }}
           >
@@ -708,6 +826,7 @@ function ManagementCard({
             sx={{
               alignSelf:
                 "flex-start",
+
               px: 0,
             }}
           >
@@ -720,7 +839,7 @@ function ManagementCard({
 }
 
 function getStoredUser():
-  StoredUser | null {
+StoredUser | null {
   const storedUserJson:
     | string
     | null =

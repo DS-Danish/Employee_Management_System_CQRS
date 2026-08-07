@@ -15,6 +15,10 @@ public interface IApplicationDbContext
 
     DbSet<EmployeeProject> EmployeeProjects { get; }
 
+    DbSet<LeaveRequest> LeaveRequests { get; }
+
+    DbSet<LeavePolicy> LeavePolicies { get; }
+
     Task<int> SaveChangesAsync(
         CancellationToken cancellationToken = default);
 }

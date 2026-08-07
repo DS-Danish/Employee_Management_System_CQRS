@@ -8,9 +8,14 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
 
-import type { StoredUser } from "../Types/auth";
+import {
+  useNavigate,
+} from "react-router-dom";
+
+import type {
+  StoredUser,
+} from "../Types/auth";
 
 interface OverviewCardProps {
   title: string;
@@ -18,9 +23,13 @@ interface OverviewCardProps {
   description: string;
 }
 
-export default function TeamLeadDashboardPage(): React.ReactElement {
-  const navigate = useNavigate();
-  const currentUser = getStoredUser();
+export default function TeamLeadDashboardPage():
+React.ReactElement {
+  const navigate =
+    useNavigate();
+
+  const currentUser =
+    getStoredUser();
 
   return (
     <Container
@@ -29,13 +38,20 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
         py: 4,
       }}
     >
+      {/* =========================
+          HEADER
+          ========================= */}
+
       <Card
         sx={{
           mb: 4,
           borderRadius: 3,
+
           background:
             "linear-gradient(135deg, #1976d2 0%, #512da8 100%)",
-          color: "common.white",
+
+          color:
+            "common.white",
         }}
       >
         <CardContent
@@ -44,6 +60,7 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
               xs: 3,
               md: 4,
             },
+
             "&:last-child": {
               pb: {
                 xs: 3,
@@ -80,12 +97,19 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
               }}
             >
               Welcome back,{" "}
-              {currentUser?.fullName ?? "Team Lead"}. Manage
-              employees and review your account information.
+              {currentUser?.fullName ??
+                "Team Lead"}.
+              Manage your team,
+              leave requests and account
+              information.
             </Typography>
           </Box>
         </CardContent>
       </Card>
+
+      {/* =========================
+          MANAGEMENT
+          ========================= */}
 
       <Box
         sx={{
@@ -98,12 +122,15 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
             fontWeight: 700,
           }}
         >
-          Overview
+          Management
         </Typography>
 
-        <Typography color="text.secondary">
-          Review your account details and access team management
-          features.
+        <Typography
+          color="text.secondary"
+        >
+          Manage employees and leave
+          activities assigned to your
+          account.
         </Typography>
       </Box>
 
@@ -111,6 +138,8 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
         container
         spacing={3}
       >
+        {/* EMPLOYEE MANAGEMENT */}
+
         <Grid
           size={{
             xs: 12,
@@ -122,7 +151,8 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
               height: "100%",
               borderRadius: 3,
               border: 1,
-              borderColor: "divider",
+              borderColor:
+                "divider",
               boxShadow: "none",
             }}
           >
@@ -147,15 +177,18 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
                   mb: 3,
                 }}
               >
-                View employee records, update employee
-                information and manage employees assigned to
-                your team.
+                View employee records,
+                update employee information
+                and manage employees assigned
+                to your team.
               </Typography>
 
               <Button
                 variant="contained"
                 onClick={() => {
-                  navigate("/team-lead/employees");
+                  navigate(
+                    "/team-lead/employees",
+                  );
                 }}
               >
                 Manage employees
@@ -163,6 +196,8 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
             </CardContent>
           </Card>
         </Grid>
+
+        {/* MY LEAVES */}
 
         <Grid
           size={{
@@ -175,7 +210,126 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
               height: "100%",
               borderRadius: 3,
               border: 1,
-              borderColor: "divider",
+              borderColor:
+                "divider",
+              boxShadow: "none",
+            }}
+          >
+            <CardContent
+              sx={{
+                p: 3,
+              }}
+            >
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                }}
+              >
+                My Leaves
+              </Typography>
+
+              <Typography
+                color="text.secondary"
+                sx={{
+                  mt: 1,
+                  mb: 3,
+                }}
+              >
+                View your annual leave
+                balance, submit leave
+                applications and track
+                their status.
+              </Typography>
+
+              <Button
+                variant="contained"
+                onClick={() => {
+                  navigate(
+                    "/team-lead/leaves",
+                  );
+                }}
+              >
+                Manage my leaves
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* EMPLOYEE LEAVE REQUESTS */}
+
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
+          <Card
+            sx={{
+              height: "100%",
+              borderRadius: 3,
+              border: 1,
+              borderColor:
+                "divider",
+              boxShadow: "none",
+            }}
+          >
+            <CardContent
+              sx={{
+                p: 3,
+              }}
+            >
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                }}
+              >
+                Leave Requests
+              </Typography>
+
+              <Typography
+                color="text.secondary"
+                sx={{
+                  mt: 1,
+                  mb: 3,
+                }}
+              >
+                Review pending leave
+                applications submitted by
+                employees assigned to your
+                team.
+              </Typography>
+
+              <Button
+                variant="contained"
+                onClick={() => {
+                  navigate(
+                    "/team-lead/leave-requests",
+                  );
+                }}
+              >
+                Review requests
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* ACCOUNT INFORMATION */}
+
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
+          <Card
+            sx={{
+              height: "100%",
+              borderRadius: 3,
+              border: 1,
+              borderColor:
+                "divider",
               boxShadow: "none",
             }}
           >
@@ -208,7 +362,8 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
                       fontWeight: 600,
                     }}
                   >
-                    {currentUser?.fullName ?? "Not available"}
+                    {currentUser?.fullName ??
+                      "Not available"}
                   </Typography>
                 </Box>
 
@@ -220,14 +375,16 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
                     Email address
                   </Typography>
 
-                    <Typography
-                      sx={{
-                        fontWeight: 600,
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {currentUser?.email ?? "Not available"}
-                    </Typography>
+                  <Typography
+                    sx={{
+                      fontWeight: 600,
+                      wordBreak:
+                        "break-word",
+                    }}
+                  >
+                    {currentUser?.email ??
+                      "Not available"}
+                  </Typography>
                 </Box>
 
                 <Box>
@@ -243,14 +400,61 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
                       fontWeight: 600,
                     }}
                   >
-                    {currentUser?.role ?? "TeamLead"}
+                    {currentUser?.role ??
+                      "TeamLead"}
                   </Typography>
                 </Box>
               </Stack>
+
+              <Button
+                sx={{
+                  mt: 3,
+                }}
+                variant="outlined"
+                onClick={() => {
+                  navigate(
+                    "/team-lead/profile",
+                  );
+                }}
+              >
+                View profile
+              </Button>
             </CardContent>
           </Card>
         </Grid>
+      </Grid>
 
+      {/* =========================
+          OVERVIEW
+          ========================= */}
+
+      <Box
+        sx={{
+          mt: 5,
+          mb: 3,
+        }}
+      >
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 700,
+          }}
+        >
+          Overview
+        </Typography>
+
+        <Typography
+          color="text.secondary"
+        >
+          Your current account and
+          access information.
+        </Typography>
+      </Box>
+
+      <Grid
+        container
+        spacing={3}
+      >
         <Grid
           size={{
             xs: 12,
@@ -274,7 +478,10 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
         >
           <OverviewCard
             title="Access Level"
-            value={currentUser?.role ?? "TeamLead"}
+            value={
+              currentUser?.role ??
+              "TeamLead"
+            }
             description="Your permissions are controlled by your assigned role."
           />
         </Grid>
@@ -289,7 +496,7 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
           <OverviewCard
             title="Employee Access"
             value="Team Members"
-            description="You can view and manage employees assigned to your team."
+            description="You can manage employees and review leave requests assigned to your team."
           />
         </Grid>
       </Grid>
@@ -301,7 +508,8 @@ function OverviewCard({
   title,
   value,
   description,
-}: OverviewCardProps): React.ReactElement {
+}: OverviewCardProps):
+React.ReactElement {
   return (
     <Card
       sx={{
@@ -310,10 +518,14 @@ function OverviewCard({
         border: 1,
         borderColor: "divider",
         boxShadow: "none",
+
         transition:
           "transform 0.2s ease, box-shadow 0.2s ease",
+
         "&:hover": {
-          transform: "translateY(-3px)",
+          transform:
+            "translateY(-3px)",
+
           boxShadow: 3,
         },
       }}
@@ -354,9 +566,12 @@ function OverviewCard({
   );
 }
 
-function getStoredUser(): StoredUser | null {
+function getStoredUser():
+StoredUser | null {
   const storedUserJson =
-    localStorage.getItem("authUser");
+    localStorage.getItem(
+      "authUser",
+    );
 
   if (!storedUserJson) {
     return null;
@@ -364,9 +579,14 @@ function getStoredUser(): StoredUser | null {
 
   try {
     const storedUser =
-      JSON.parse(storedUserJson) as StoredUser;
+      JSON.parse(
+        storedUserJson,
+      ) as StoredUser;
 
-    if (storedUser.role !== "TeamLead") {
+    if (
+      storedUser.role !==
+      "TeamLead"
+    ) {
       return null;
     }
 

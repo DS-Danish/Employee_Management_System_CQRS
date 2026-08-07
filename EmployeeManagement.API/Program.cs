@@ -158,158 +158,174 @@ builder.Services
 builder.Services.AddAuthorization(
     options =>
     {
+
         options.AddPolicy(
-            AuthorizationPolicies
-                .ViewEmployees,
+            AuthorizationPolicies.ViewEmployees,
             policy =>
             {
-                policy
-                    .RequireAuthenticatedUser();
+                policy.RequireAuthenticatedUser();
 
                 policy.RequireAssertion(
                     context =>
-                        context.User
-                            .IsInRole(
-                                AppRoles
-                                    .SuperAdmin) ||
-                        context.User
-                            .HasClaim(
-                                AppPermissions
-                                    .ClaimType,
-                                AppPermissions
-                                    .ViewEmployees));
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.ViewEmployees));
             });
 
         options.AddPolicy(
-            AuthorizationPolicies
-                .ManageEmployees,
+            AuthorizationPolicies.ManageEmployees,
             policy =>
             {
-                policy
-                    .RequireAuthenticatedUser();
+                policy.RequireAuthenticatedUser();
 
                 policy.RequireAssertion(
                     context =>
-                        context.User
-                            .IsInRole(
-                                AppRoles
-                                    .SuperAdmin) ||
-                        context.User
-                            .HasClaim(
-                                AppPermissions
-                                    .ClaimType,
-                                AppPermissions
-                                    .ManageEmployees));
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.ManageEmployees));
             });
 
         options.AddPolicy(
-            AuthorizationPolicies
-                .DeleteEmployees,
+            AuthorizationPolicies.DeleteEmployees,
             policy =>
             {
-                policy
-                    .RequireAuthenticatedUser();
+                policy.RequireAuthenticatedUser();
 
                 policy.RequireAssertion(
                     context =>
-                        context.User
-                            .IsInRole(
-                                AppRoles
-                                    .SuperAdmin) ||
-                        context.User
-                            .HasClaim(
-                                AppPermissions
-                                    .ClaimType,
-                                AppPermissions
-                                    .DeleteEmployees));
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.DeleteEmployees));
             });
 
         options.AddPolicy(
-            AuthorizationPolicies
-                .ViewDepartments,
+            AuthorizationPolicies.ViewDepartments,
             policy =>
             {
-                policy
-                    .RequireAuthenticatedUser();
+                policy.RequireAuthenticatedUser();
 
                 policy.RequireAssertion(
                     context =>
-                        context.User
-                            .IsInRole(
-                                AppRoles
-                                    .SuperAdmin) ||
-                        context.User
-                            .HasClaim(
-                                AppPermissions
-                                    .ClaimType,
-                                AppPermissions
-                                    .ViewDepartments));
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.ViewDepartments));
             });
 
         options.AddPolicy(
-            AuthorizationPolicies
-                .ManageDepartments,
+            AuthorizationPolicies.ManageDepartments,
             policy =>
             {
-                policy
-                    .RequireAuthenticatedUser();
+                policy.RequireAuthenticatedUser();
 
                 policy.RequireAssertion(
                     context =>
-                        context.User
-                            .IsInRole(
-                                AppRoles
-                                    .SuperAdmin) ||
-                        context.User
-                            .HasClaim(
-                                AppPermissions
-                                    .ClaimType,
-                                AppPermissions
-                                    .ManageDepartments));
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.ManageDepartments));
             });
 
         options.AddPolicy(
-            AuthorizationPolicies
-                .ViewProjects,
+            AuthorizationPolicies.ViewProjects,
             policy =>
             {
-                policy
-                    .RequireAuthenticatedUser();
+                policy.RequireAuthenticatedUser();
 
                 policy.RequireAssertion(
                     context =>
-                        context.User
-                            .IsInRole(
-                                AppRoles
-                                    .SuperAdmin) ||
-                        context.User
-                            .HasClaim(
-                                AppPermissions
-                                    .ClaimType,
-                                AppPermissions
-                                    .ViewProjects));
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.ViewProjects));
             });
 
         options.AddPolicy(
-            AuthorizationPolicies
-                .ManageProjects,
+            AuthorizationPolicies.ManageProjects,
             policy =>
             {
-                policy
-                    .RequireAuthenticatedUser();
+                policy.RequireAuthenticatedUser();
 
                 policy.RequireAssertion(
                     context =>
-                        context.User
-                            .IsInRole(
-                                AppRoles
-                                    .SuperAdmin) ||
-                        context.User
-                            .HasClaim(
-                                AppPermissions
-                                    .ClaimType,
-                                AppPermissions
-                                    .ManageProjects));
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.ManageProjects));
+            });
+
+        options.AddPolicy(
+            AuthorizationPolicies.ViewTeamLeaves,
+            policy =>
+            {
+                policy.RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.IsInRole(
+                            AppRoles.TeamLead) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.ViewTeamLeaves));
+            });
+
+        options.AddPolicy(
+            AuthorizationPolicies.ReviewTeamLeaves,
+            policy =>
+            {
+                policy.RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.IsInRole(
+                            AppRoles.TeamLead) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.ReviewTeamLeaves));
+            });
+
+        options.AddPolicy(
+            AuthorizationPolicies.ViewAllLeaves,
+            policy =>
+            {
+                policy.RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.ViewAllLeaves));
+            });
+
+        options.AddPolicy(
+            AuthorizationPolicies.ManageLeavePolicies,
+            policy =>
+            {
+                policy.RequireAuthenticatedUser();
+
+                policy.RequireAssertion(
+                    context =>
+                        context.User.IsInRole(
+                            AppRoles.SuperAdmin) ||
+                        context.User.HasClaim(
+                            AppPermissions.ClaimType,
+                            AppPermissions.ManageLeavePolicies));
             });
     });
 

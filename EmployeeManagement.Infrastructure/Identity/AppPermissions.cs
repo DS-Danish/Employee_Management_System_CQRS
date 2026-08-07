@@ -5,6 +5,10 @@ public static class AppPermissions
     public const string ClaimType =
         "permission";
 
+    // =========================================================
+    // EMPLOYEES
+    // =========================================================
+
     public const string ViewEmployees =
         "employees.view";
 
@@ -14,11 +18,19 @@ public static class AppPermissions
     public const string DeleteEmployees =
         "employees.delete";
 
+    // =========================================================
+    // DEPARTMENTS
+    // =========================================================
+
     public const string ViewDepartments =
         "departments.view";
 
     public const string ManageDepartments =
         "departments.manage";
+
+    // =========================================================
+    // PROJECTS
+    // =========================================================
 
     public const string ViewProjects =
         "projects.view";
@@ -26,12 +38,26 @@ public static class AppPermissions
     public const string ManageProjects =
         "projects.manage";
 
+    // =========================================================
+    // LEAVES
+    // =========================================================
+
+    public const string ViewTeamLeaves =
+        "leaves.team.view";
+
+    public const string ReviewTeamLeaves =
+        "leaves.team.review";
+
+    public const string ViewAllLeaves =
+        "leaves.all.view";
+
+    public const string ManageLeavePolicies =
+        "leaves.policies.manage";
+
     public static readonly
-        IReadOnlyCollection<
-            PermissionDefinition>
+        IReadOnlyCollection<PermissionDefinition>
         All =
-        new[]
-        {
+        [
             new PermissionDefinition(
                 "View Employees",
                 ViewEmployees),
@@ -59,10 +85,25 @@ public static class AppPermissions
             new PermissionDefinition(
                 "Manage Projects",
                 ManageProjects),
-        };
+
+            new PermissionDefinition(
+                "View Team Leaves",
+                ViewTeamLeaves),
+
+            new PermissionDefinition(
+                "Review Team Leaves",
+                ReviewTeamLeaves),
+
+            new PermissionDefinition(
+                "View All Leaves",
+                ViewAllLeaves),
+
+            new PermissionDefinition(
+                "Manage Leave Policies",
+                ManageLeavePolicies)
+        ];
 }
 
-public sealed record
-    PermissionDefinition(
-        string Name,
-        string Code);
+public sealed record PermissionDefinition(
+    string Name,
+    string Code);

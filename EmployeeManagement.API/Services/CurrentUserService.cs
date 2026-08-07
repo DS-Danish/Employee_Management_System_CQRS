@@ -6,8 +6,7 @@ namespace EmployeeManagement.API.Services;
 public sealed class CurrentUserService
     : ICurrentUserService
 {
-    private readonly IHttpContextAccessor
-        _httpContextAccessor;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public CurrentUserService(
         IHttpContextAccessor httpContextAccessor)

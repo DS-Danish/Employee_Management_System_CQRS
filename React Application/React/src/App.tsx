@@ -18,6 +18,8 @@ import {
 } from "./Pages/EmployeesPage";
 import EmployeeProfilePage from "./Pages/EmployeeProfilePage";
 import LoginPage from "./Pages/LoginPage";
+import MyLeavesPage from "./Pages/MyLeavesPage";
+import PendingLeavesPage from "./Pages/PendingLeavesPage";
 import PermissionManagementPage from "./Pages/PermissionManagementPage";
 import {
   ProjectsPage,
@@ -31,16 +33,19 @@ import {
   TeamLeadLayout,
 } from "./Pages/TeamLeadLayout";
 
-
 import type {
   StoredUser,
   UserRole,
 } from "./Types/auth";
 
 export default function App():
-  React.ReactElement {
+React.ReactElement {
   return (
     <Routes>
+      {/* =========================
+          PUBLIC
+          ========================= */}
+
       <Route
         path="/login"
         element={
@@ -65,6 +70,13 @@ export default function App():
           path="/employee/dashboard"
           element={
             <DashboardPage />
+          }
+        />
+
+        <Route
+          path="/employee/leaves"
+          element={
+            <MyLeavesPage />
           }
         />
       </Route>
@@ -133,7 +145,7 @@ export default function App():
       </Route>
 
       {/* =========================
-          TEAM LEAD / ADMIN
+          TEAM LEAD
           ========================= */}
 
       <Route
@@ -168,6 +180,28 @@ export default function App():
             }
           />
 
+          {/* =====================
+              TEAM LEAD LEAVES
+              ===================== */}
+
+          <Route
+            path="leaves"
+            element={
+              <MyLeavesPage />
+            }
+          />
+
+          <Route
+            path="leave-requests"
+            element={
+              <PendingLeavesPage />
+            }
+          />
+
+          {/* =====================
+              EMPLOYEES
+              ===================== */}
+
           <Route
             element={
               <ProtectedRoute
@@ -185,6 +219,10 @@ export default function App():
               }
             />
           </Route>
+
+          {/* =====================
+              DEPARTMENTS
+              ===================== */}
 
           <Route
             element={
@@ -204,6 +242,10 @@ export default function App():
             />
           </Route>
 
+          {/* =====================
+              PROJECTS
+              ===================== */}
+
           <Route
             element={
               <ProtectedRoute
@@ -222,22 +264,20 @@ export default function App():
             />
           </Route>
 
-          {/*
-           * Permission Management is a
-           * TeamLead role responsibility.
-           *
-           * It intentionally does not
-           * require an AppPermission.
-           *
-           * Backend controls that TeamLead
-           * may modify Employees only.
-           */}
+          {/* =====================
+              PERMISSIONS
+              ===================== */}
+
           <Route
             path="permissions"
             element={
               <PermissionManagementPage />
             }
           />
+
+          {/* =====================
+              PROFILE
+              ===================== */}
 
           <Route
             path="profile"
@@ -318,8 +358,23 @@ export default function App():
               <PermissionManagementPage />
             }
           />
+
+          {/* =====================
+              LEAVE MANAGEMENT
+              ===================== */}
+
+          <Route
+            path="leave-requests"
+            element={
+              <PendingLeavesPage />
+            }
+          />
         </Route>
       </Route>
+
+      {/* =========================
+          REDIRECTS
+          ========================= */}
 
       <Route
         path="/dashboard"
@@ -346,7 +401,7 @@ export default function App():
 }
 
 function RootRedirect():
-  React.ReactElement {
+React.ReactElement {
   const token =
     localStorage.getItem(
       "authToken",
@@ -371,7 +426,7 @@ function RootRedirect():
 }
 
 function DashboardRedirect():
-  React.ReactElement {
+React.ReactElement {
   const token =
     localStorage.getItem(
       "authToken",
@@ -492,7 +547,7 @@ function isTokenExpired(
 }
 
 function clearAuthentication():
-  void {
+void {
   localStorage.removeItem(
     "authToken",
   );

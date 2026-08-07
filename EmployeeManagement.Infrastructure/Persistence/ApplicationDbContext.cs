@@ -37,6 +37,12 @@ public class ApplicationDbContext
     public DbSet<UserPermission> UserPermissions =>
         Set<UserPermission>();
 
+    public DbSet<LeaveRequest> LeaveRequests =>
+        Set<LeaveRequest>();
+
+    public DbSet<LeavePolicy> LeavePolicies =>
+        Set<LeavePolicy>();
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
@@ -49,14 +55,12 @@ public class ApplicationDbContext
             entity =>
             {
                 entity.Property(
-                        user =>
-                            user.FullName)
+                        user => user.FullName)
                     .HasMaxLength(200)
                     .IsRequired();
 
                 entity.HasIndex(
-                        user =>
-                            user.EmployeeId)
+                        user => user.EmployeeId)
                     .IsUnique()
                     .HasFilter(
                         "[EmployeeId] IS NOT NULL");
@@ -64,16 +68,14 @@ public class ApplicationDbContext
                 entity.HasOne<Employee>()
                     .WithOne()
                     .HasForeignKey<ApplicationUser>(
-                        user =>
-                            user.EmployeeId)
+                        user => user.EmployeeId)
                     .OnDelete(
                         DeleteBehavior.Restrict);
 
                 entity.HasOne<Department>()
                     .WithMany()
                     .HasForeignKey(
-                        user =>
-                            user.DepartmentId)
+                        user => user.DepartmentId)
                     .OnDelete(
                         DeleteBehavior.Restrict);
             });
