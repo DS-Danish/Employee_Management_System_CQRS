@@ -396,30 +396,48 @@ public sealed class PermissionsController
                 .UserPermissions
                 .Where(
                     userPermission =>
-                        userPermission.UserId ==
-                        userId)
-                .ToListAsync(
-                    cancellationToken);
+                        userPermission.UserId == userId)
+                .ToListAsync(cancellationToken);
+
+        HashSet<int> currentPermissionIds =
+            currentPermissions
+                .Select(
+                    userPermission =>
+                        userPermission.PermissionId)
+                .ToHashSet();
+
+        HashSet<int> requestedPermissionIdSet =
+            validPermissionIds.ToHashSet();
+
+        List<UserPermission> permissionsToRemove =
+            currentPermissions
+                .Where(
+                    userPermission =>
+                        !requestedPermissionIdSet.Contains(
+                            userPermission.PermissionId))
+                .ToList();
+
+        IEnumerable<int> permissionIdsToAdd =
+            requestedPermissionIdSet
+                .Where(
+                    permissionId =>
+                        !currentPermissionIds.Contains(
+                            permissionId));
 
         _dbContext
             .UserPermissions
             .RemoveRange(
-                currentPermissions);
+                permissionsToRemove);
 
-        foreach (
-            int permissionId
-            in validPermissionIds)
+        foreach (int permissionId in permissionIdsToAdd)
         {
             _dbContext
                 .UserPermissions
                 .Add(
                     new UserPermission
                     {
-                        UserId =
-                            userId,
-
-                        PermissionId =
-                            permissionId
+                        UserId = userId,
+                        PermissionId = permissionId
                     });
         }
 
@@ -427,8 +445,8 @@ public sealed class PermissionsController
             .SaveChangesAsync(
                 cancellationToken);
 
-        return NoContent();
-    }
+        return NoContent(); 
+        }
 
     /*
      * Only SuperAdmin and TeamLead/Admin

@@ -319,12 +319,27 @@ export default function EmployeeProfilePage():
     setEditing(false);
   }
 
+  const hasChanges: boolean = useMemo(() => {
+    if (!profile) {
+      return false;
+    }
+
+    return (
+      formValues.firstName.trim() !== (profile.firstName ?? "").trim() ||
+      formValues.lastName.trim() !== (profile.lastName ?? "").trim() ||
+      formValues.street.trim() !== (profile.street ?? "").trim() ||
+      formValues.city.trim() !== (profile.city ?? "").trim() ||
+      formValues.country.trim() !== (profile.country ?? "").trim() ||
+      formValues.postalCode.trim() !== (profile.postalCode ?? "").trim()
+    );
+  }, [formValues, profile]);
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault();
 
-    if (saving) {
+    if (saving || !hasChanges) {
       return;
     }
 
@@ -925,7 +940,7 @@ export default function EmployeeProfilePage():
                       type="submit"
                       variant="contained"
                       disableElevation
-                      disabled={saving}
+                      disabled={saving || !hasChanges}
                       startIcon={
                         saving ? (
                           <CircularProgress

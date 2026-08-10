@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import {
   Box,
@@ -20,7 +20,7 @@ interface EmployeeTableProps {
   employees: Employee[];
   loading: boolean;
   deletingEmployeeId: string | null;
-  renderActions: (employee: Employee) => ReactNode;
+  renderActions?: (employee: Employee) => ReactNode;
 }
 
 export function EmployeeTable({
@@ -28,7 +28,7 @@ export function EmployeeTable({
   loading,
   deletingEmployeeId,
   renderActions,
-}: EmployeeTableProps) {
+}: EmployeeTableProps): ReactElement {
   if (loading) {
     return (
       <Paper
@@ -54,46 +54,52 @@ export function EmployeeTable({
           textAlign: "center",
         }}
       >
-        <Typography
-          variant="h6"
-          sx={{ mb: 1 }}
-        >
+        <Typography variant="h6" sx={{ mb: 1 }}>
           No employees found
         </Typography>
 
         <Typography color="text.secondary">
-          Create an employee to display it here.
+          No employee records are available.
         </Typography>
       </Paper>
     );
   }
 
   return (
-    <TableContainer component={Paper} variant="outlined">
+    <TableContainer component={Paper}>
       <Table>
         <TableHead>
           <TableRow>
-            <TableCell width={60}>Sr. No</TableCell>
+            <TableCell>Sr. No</TableCell>
             <TableCell>Employee</TableCell>
             <TableCell>Email</TableCell>
             <TableCell>Department</TableCell>
             <TableCell>City</TableCell>
             <TableCell>Projects</TableCell>
             <TableCell>Phone</TableCell>
-            <TableCell align="right">Actions</TableCell>
+
+            {renderActions && (
+              <TableCell align="right">
+                Actions
+              </TableCell>
+            )}
           </TableRow>
         </TableHead>
 
         <TableBody>
           {employees.map(
-            (employee: Employee, index: number) => {
+            (
+              employee: Employee,
+              index: number,
+            ): ReactElement => {
               const projectNames: string =
                 employee.projects
                   ?.map(
-                    (project: Project): string =>
-                      project.name,
+                    (
+                      project: Project,
+                    ): string => project.name,
                   )
-                  .join(", ") || "Not assigned";
+                  .join(", ") ?? "Not assigned";
 
               const departmentName: string =
                 employee.department?.name ??
@@ -101,7 +107,7 @@ export function EmployeeTable({
                 "Not assigned";
 
               const phoneNumber: string =
-                employee.employeeDetail?.phoneNumber ||
+                employee.employeeDetail?.phoneNumber ??
                 "Not provided";
 
               return (
@@ -115,7 +121,9 @@ export function EmployeeTable({
                         : 1,
                   }}
                 >
-                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>
+                    {index + 1}
+                  </TableCell>
 
                   <TableCell>
                     <Box>
@@ -137,21 +145,31 @@ export function EmployeeTable({
                     </Box>
                   </TableCell>
 
-                  <TableCell>{employee.email}</TableCell>
+                  <TableCell>
+                    {employee.email}
+                  </TableCell>
 
                   <TableCell>
                     {departmentName}
                   </TableCell>
 
-                  <TableCell>{employee.city}</TableCell>
-
-                  <TableCell>{projectNames}</TableCell>
-
-                  <TableCell>{phoneNumber}</TableCell>
-
-                  <TableCell align="right">
-                    {renderActions(employee)}
+                  <TableCell>
+                    {employee.city}
                   </TableCell>
+
+                  <TableCell>
+                    {projectNames}
+                  </TableCell>
+
+                  <TableCell>
+                    {phoneNumber}
+                  </TableCell>
+
+                  {renderActions && (
+                    <TableCell align="right">
+                      {renderActions(employee)}
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             },

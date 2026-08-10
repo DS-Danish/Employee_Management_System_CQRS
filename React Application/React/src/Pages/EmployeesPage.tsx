@@ -175,7 +175,11 @@ export function EmployeesPage() {
   const currentUser =
     getStoredUser();
 
-  const canDeleteEmployees =
+  const canManageEmployees: boolean =
+    currentUser?.role === "SuperAdmin" ||
+    currentUser?.role === "TeamLead";
+
+  const canDeleteEmployees: boolean =
     currentUser?.role === "SuperAdmin";
 
   const [employees, setEmployees] =
@@ -346,7 +350,8 @@ export function EmployeesPage() {
   }
 
   function handleEditOpen(): void {
-    if (!selectedEmployee) {
+    if (!canManageEmployees ||
+        !selectedEmployee) {
       return;
     }
 
@@ -515,18 +520,20 @@ export function EmployeesPage() {
                   </span>
                 </Tooltip>
 
-                <Button
-                  type="button"
-                  variant="contained"
-                  disableElevation
-                  startIcon={<AddIcon />}
-                  onClick={() =>
-                    setCreateModalOpen(true)
-                  }
-                  sx={{ borderRadius: 2, px: 2.5 }}
-                >
-                  Add employee
-                </Button>
+                {canManageEmployees && (
+                  <Button
+                    type="button"
+                    variant="contained"
+                    disableElevation
+                    startIcon={<AddIcon />}
+                    onClick={() =>
+                      setCreateModalOpen(true)
+                    }
+                    sx={{ borderRadius: 2, px: 2.5 }}
+                  >
+                    Add employee
+                  </Button>
+                )}
               </Stack>
             </Box>
           </Paper>
@@ -610,18 +617,20 @@ export function EmployeesPage() {
                 departments and projects.
               </Typography>
 
-              <Button
-                type="button"
-                variant="contained"
-                disableElevation
-                startIcon={<AddIcon />}
-                onClick={() =>
-                  setCreateModalOpen(true)
-                }
-                sx={{ borderRadius: 2, px: 2.5 }}
-              >
-                Add employee
-              </Button>
+              {canManageEmployees && (
+                <Button
+                  type="button"
+                  variant="contained"
+                  disableElevation
+                  startIcon={<AddIcon />}
+                  onClick={() =>
+                    setCreateModalOpen(true)
+                  }
+                  sx={{ borderRadius: 2, px: 2.5 }}
+                >
+                  Add employee
+                </Button>
+              )}
             </Paper>
           ) : (
             <Paper
@@ -635,32 +644,37 @@ export function EmployeesPage() {
                 employees={employees}
                 loading={loading}
                 deletingEmployeeId={deletingEmployeeId}
-                renderActions={(employee: Employee) => (
-                  <Tooltip title="Employee actions">
-                    <span>
-                      <IconButton
-                        aria-label={`Actions for ${
-                          employee.fullName ||
-                          employee.email
-                        }`}
-                        disabled={
-                          deletingEmployeeId ===
-                          employee.id
-                        }
-                        onClick={(
-                          event: MouseEvent<HTMLButtonElement>,
-                        ) =>
-                          handleMenuOpen(
-                            event,
-                            employee,
-                          )
-                        }
-                      >
-                        <MoreVertIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                )}
+                renderActions={
+                  canManageEmployees ||
+                  canDeleteEmployees
+                    ? (employee: Employee) => (
+                        <Tooltip title="Employee actions">
+                          <span>
+                            <IconButton
+                              aria-label={`Actions for ${
+                                employee.fullName ||
+                                employee.email
+                              }`}
+                              disabled={
+                                deletingEmployeeId ===
+                                employee.id
+                              }
+                              onClick={(
+                                event: MouseEvent<HTMLButtonElement>,
+                              ) =>
+                                handleMenuOpen(
+                                  event,
+                                  employee,
+                                )
+                              }
+                            >
+                              <MoreVertIcon />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )
+                    : undefined
+                }
               />
             </Paper>
           )}
@@ -687,15 +701,17 @@ export function EmployeesPage() {
             },
           }}
         >
-          <MenuItem onClick={handleEditOpen}>
-            <ListItemIcon>
-              <EditIcon fontSize="small" />
-            </ListItemIcon>
+          {canManageEmployees && (
+            <MenuItem onClick={handleEditOpen}>
+              <ListItemIcon>
+                <EditIcon fontSize="small" />
+              </ListItemIcon>
 
-            <ListItemText>
-              Edit employee
-            </ListItemText>
-          </MenuItem>
+              <ListItemText>
+                Edit employee
+              </ListItemText>
+            </MenuItem>
+          )}
 
           {canDeleteEmployees && (
             <>
@@ -789,24 +805,28 @@ export function EmployeesPage() {
           </Dialog>
         )}
 
-        <CreateEmployeeModal
-          open={createModalOpen}
-          departments={departments}
-          projects={projects}
-          onClose={() =>
-            setCreateModalOpen(false)
-          }
-          onCreated={handleEmployeeCreated}
-        />
+        {canManageEmployees && (
+          <>
+            <CreateEmployeeModal
+              open={createModalOpen}
+              departments={departments}
+              projects={projects}
+              onClose={() =>
+                setCreateModalOpen(false)
+              }
+              onCreated={handleEmployeeCreated}
+            />
 
-        <EditEmployeeModal
-          open={editModalOpen}
-          employee={selectedEmployee}
-          departments={departments}
-          projects={projects}
-          onClose={handleEditClose}
-          onUpdated={handleEmployeeUpdated}
-        />
+            <EditEmployeeModal
+              open={editModalOpen}
+              employee={selectedEmployee}
+              departments={departments}
+              projects={projects}
+              onClose={handleEditClose}
+              onUpdated={handleEmployeeUpdated}
+            />
+          </>
+        )}
 
         <Snackbar
           open={Boolean(successMessage)}

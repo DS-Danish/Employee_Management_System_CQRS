@@ -42,6 +42,12 @@ import type {
   PermissionUser,
 } from "../Types/permission";
 
+const EMPLOYEE_RESTRICTED_PERMISSION_CODES: ReadonlySet<string> =
+  new Set<string>([
+    "employees.manage",
+    "employees.delete",
+  ]);
+
 export default function PermissionManagementPage():
   React.ReactElement {
   const currentUser: StoredUser | null =
@@ -65,6 +71,11 @@ export default function PermissionManagementPage():
   const [
     selectedPermissionIds,
     setSelectedPermissionIds,
+  ] = useState<number[]>([]);
+
+  const [
+    originalPermissionIds,
+    setOriginalPermissionIds,
   ] = useState<number[]>([]);
 
   const [
@@ -123,6 +134,47 @@ export default function PermissionManagementPage():
       ],
     );
 
+  const selectedUser: PermissionUser | undefined =
+    useMemo(
+      () =>
+        manageableUsers.find(
+          (
+            user: PermissionUser,
+          ): boolean =>
+            user.id === selectedUserId,
+        ),
+      [
+        manageableUsers,
+        selectedUserId,
+      ],
+    );
+
+  const assignablePermissions: Permission[] =
+    useMemo(
+      () => {
+        if (!selectedUser) {
+          return [];
+        }
+
+        if (selectedUser.role === "Employee") {
+          return permissions.filter(
+            (
+              permission: Permission,
+            ): boolean =>
+              !EMPLOYEE_RESTRICTED_PERMISSION_CODES.has(
+                permission.code,
+              ),
+          );
+        }
+
+        return permissions;
+      },
+      [
+        permissions,
+        selectedUser,
+      ],
+    );
+
   useEffect(() => {
     async function loadData():
       Promise<void> {
@@ -170,6 +222,10 @@ export default function PermissionManagementPage():
       [],
     );
 
+    setOriginalPermissionIds(
+      [],
+    );
+
     setSuccessMessage("");
     setErrorMessage("");
 
@@ -204,14 +260,47 @@ export default function PermissionManagementPage():
           userId,
         );
 
-      setSelectedPermissionIds(
-        userPermissions.map(
+      const selectedPermissionUser:
+        PermissionUser | undefined =
+        manageableUsers.find(
           (
-            permission:
-              Permission,
-          ) =>
-            permission.id,
-        ),
+            user: PermissionUser,
+          ): boolean =>
+            user.id === userId,
+        );
+
+      const permissionIds: number[] =
+        userPermissions
+          .filter(
+            (
+              permission: Permission,
+            ): boolean => {
+              if (
+                selectedPermissionUser?.role !==
+                "Employee"
+              ) {
+                return true;
+              }
+
+              return !EMPLOYEE_RESTRICTED_PERMISSION_CODES
+                .has(
+                  permission.code,
+                );
+            },
+          )
+          .map(
+            (
+              permission: Permission,
+            ): number =>
+              permission.id,
+          );
+
+      setSelectedPermissionIds(
+        permissionIds,
+      );
+
+      setOriginalPermissionIds(
+        permissionIds,
       );
     } catch (error: unknown) {
       setErrorMessage(
@@ -264,6 +353,36 @@ export default function PermissionManagementPage():
     );
   }
 
+  const hasPermissionChanges: boolean =
+    useMemo(
+      () => {
+        if (!selectedUserId) {
+          return false;
+        }
+
+        if (
+          selectedPermissionIds.length !==
+          originalPermissionIds.length
+        ) {
+          return true;
+        }
+
+        return selectedPermissionIds.some(
+          (
+            permissionId: number,
+          ): boolean =>
+            !originalPermissionIds.includes(
+              permissionId,
+            ),
+        );
+      },
+      [
+        selectedUserId,
+        selectedPermissionIds,
+        originalPermissionIds,
+      ],
+    );
+
   async function handleSave():
     Promise<void> {
     if (!selectedUserId) {
@@ -287,14 +406,47 @@ export default function PermissionManagementPage():
       return;
     }
 
+    if (!hasPermissionChanges) {
+      return;
+    }
+
     try {
       setSaving(true);
       setErrorMessage("");
       setSuccessMessage("");
 
+      const assignablePermissionIds:
+        Set<number> =
+        new Set<number>(
+          assignablePermissions.map(
+            (
+              permission: Permission,
+            ): number =>
+              permission.id,
+          ),
+        );
+
+      const permissionIdsToSave: number[] =
+        selectedPermissionIds.filter(
+          (
+            permissionId: number,
+          ): boolean =>
+            assignablePermissionIds.has(
+              permissionId,
+            ),
+        );
+
       await updateUserPermissions(
         selectedUserId,
-        selectedPermissionIds,
+        permissionIdsToSave,
+      );
+
+      setOriginalPermissionIds(
+        [...permissionIdsToSave],
+      );
+
+      setSelectedPermissionIds(
+        [...permissionIdsToSave],
       );
 
       setSuccessMessage(
@@ -509,6 +661,16 @@ export default function PermissionManagementPage():
                       </Typography>
                     </Box>
 
+                    {selectedUser?.role ===
+                      "Employee" && (
+                      <Alert severity="info">
+                        Employees may be granted view access,
+                        but employee edit and delete permissions
+                        are restricted to Team Leads and
+                        Super Admins.
+                      </Alert>
+                    )}
+
                     {loadingUserPermissions ? (
                       <Box
                         sx={{
@@ -524,7 +686,7 @@ export default function PermissionManagementPage():
                       </Box>
                     ) : (
                       <Stack spacing={1}>
-                        {permissions.map(
+                        {assignablePermissions.map(
                           (
                             permission:
                               Permission,
@@ -585,7 +747,8 @@ export default function PermissionManagementPage():
                       variant="contained"
                       disabled={
                         saving ||
-                        loadingUserPermissions
+                        loadingUserPermissions ||
+                        !hasPermissionChanges
                       }
                       onClick={() =>
                         void handleSave()

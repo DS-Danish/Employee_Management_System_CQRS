@@ -10,8 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EmployeeManagement.API.Controllers;
 
 [ApiController]
-[Route(
-    "api/employees/{employeeId:guid}/projects")]
+[Route("api/employees/{employeeId:guid}/projects")]
 [Authorize]
 public sealed class EmployeeProjectsController
     : ControllerBase
@@ -55,10 +54,6 @@ public sealed class EmployeeProjectsController
     }
 
     [HttpGet]
-    [Authorize(
-        Roles =
-            AppRoles.SuperAdmin + "," +
-            AppRoles.TeamLead)]
     public async Task<ActionResult<
         IReadOnlyList<EmployeeProjectDto>>> GetAll(
         Guid employeeId,

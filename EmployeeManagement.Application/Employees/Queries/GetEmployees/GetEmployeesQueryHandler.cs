@@ -42,7 +42,8 @@ public sealed class GetEmployeesQueryHandler
         }
 
         IQueryable<Employee> query =
-            _dbContext.Employees
+            _dbContext
+                .Employees
                 .AsNoTracking();
 
         bool isSuperAdmin =
@@ -53,6 +54,22 @@ public sealed class GetEmployeesQueryHandler
             _currentUserService.IsInRole(
                 AppRoles.TeamLead);
 
+        bool canViewEmployees =
+            _currentUserService.HasPermission(
+                AppPermissions.ViewEmployees);
+
+        /*
+         * SuperAdmin:
+         *     Can view all employees.
+         *
+         * TeamLead:
+         *     Can view only employees assigned
+         *     to their team.
+         *
+         * Employee:
+         *     Can view employees only when
+         *     employees.view permission is assigned.
+         */
         if (isTeamLead &&
             !isSuperAdmin)
         {
@@ -68,7 +85,8 @@ public sealed class GetEmployeesQueryHandler
                         employee.TeamLeadId ==
                         teamLeadEmployeeId);
         }
-        else if (!isSuperAdmin)
+        else if (!isSuperAdmin &&
+                 !canViewEmployees)
         {
             throw new UnauthorizedAccessException(
                 "You are not authorized to view employees.");

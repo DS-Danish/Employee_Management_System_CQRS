@@ -10,7 +10,6 @@ using EmployeeManagement.Application.Common.Constants;
 
 using EmployeeManagement.Infrastructure;
 using EmployeeManagement.Infrastructure.Identity;
-using EmployeeManagement.Infrastructure.Persistence;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;

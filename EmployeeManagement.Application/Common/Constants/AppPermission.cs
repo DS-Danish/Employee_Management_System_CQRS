@@ -1,4 +1,4 @@
-namespace EmployeeManagement.Infrastructure.Identity;
+namespace EmployeeManagement.Application.Common.Constants;
 
 public static class AppPermissions
 {
@@ -53,6 +53,10 @@ public static class AppPermissions
 
     public const string ManageLeavePolicies =
         "leaves.policies.manage";
+
+    // =========================================================
+    // ALL PERMISSIONS
+    // =========================================================
 
     public static readonly
         IReadOnlyCollection<PermissionDefinition>

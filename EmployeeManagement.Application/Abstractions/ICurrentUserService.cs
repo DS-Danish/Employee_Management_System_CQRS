@@ -13,4 +13,6 @@ public interface ICurrentUserService
     string? Role { get; }
 
     bool IsInRole(string role);
+
+    bool HasPermission(string permission);
 }

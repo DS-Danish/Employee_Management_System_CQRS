@@ -6,7 +6,11 @@ namespace EmployeeManagement.API.Services;
 public sealed class CurrentUserService
     : ICurrentUserService
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private const string PermissionClaimType =
+        "permission";
+
+    private readonly IHttpContextAccessor
+        _httpContextAccessor;
 
     public CurrentUserService(
         IHttpContextAccessor httpContextAccessor)
@@ -50,6 +54,28 @@ public sealed class CurrentUserService
 
         return User?.IsInRole(role) ??
                false;
+    }
+
+    public bool HasPermission(
+        string permission)
+    {
+        if (string.IsNullOrWhiteSpace(
+                permission))
+        {
+            return false;
+        }
+
+        return User?
+                   .FindAll(
+                       PermissionClaimType)
+                   .Any(
+                       claim =>
+                           string.Equals(
+                               claim.Value,
+                               permission,
+                               StringComparison
+                                   .OrdinalIgnoreCase))
+               ?? false;
     }
 
     private Guid? GetGuidClaim(
