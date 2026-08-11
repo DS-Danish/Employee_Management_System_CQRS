@@ -1,6 +1,7 @@
 using EmployeeManagement.Application.Abstractions;
 using EmployeeManagement.Domain.Entities;
 using EmployeeManagement.Infrastructure.Identity;
+
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,8 +35,8 @@ public class ApplicationDbContext
     public DbSet<Permission> Permissions =>
         Set<Permission>();
 
-    public DbSet<UserPermission> UserPermissions =>
-        Set<UserPermission>();
+    public DbSet<RolePermission> RolePermissions =>
+        Set<RolePermission>();
 
     public DbSet<LeaveRequest> LeaveRequests =>
         Set<LeaveRequest>();

@@ -4,8 +4,8 @@ import {
 
 import type {
   Permission,
-  PermissionUser,
-  UpdateUserPermissionsRequest,
+  PermissionRole,
+  UpdateRolePermissionsRequest,
 } from "../Types/permission";
 
 export async function getPermissions():
@@ -15,32 +15,31 @@ export async function getPermissions():
   );
 }
 
-export async function getPermissionUsers():
-  Promise<PermissionUser[]> {
-  return apiRequest<PermissionUser[]>(
-    "/permissions/users",
+export async function getPermissionRoles():
+  Promise<PermissionRole[]> {
+  return apiRequest<PermissionRole[]>(
+    "/permissions/roles",
   );
 }
 
-export async function getUserPermissions(
-  userId: string,
+export async function getRolePermissions(
+  roleName: string,
 ): Promise<Permission[]> {
   return apiRequest<Permission[]>(
-    `/permissions/users/${userId}`,
+    `/permissions/roles/${encodeURIComponent(roleName)}`,
   );
 }
 
-export async function updateUserPermissions(
-  userId: string,
+export async function updateRolePermissions(
+  roleName: string,
   permissionIds: number[],
 ): Promise<void> {
-  const request:
-    UpdateUserPermissionsRequest = {
-      permissionIds,
-    };
+  const request: UpdateRolePermissionsRequest = {
+    permissionIds,
+  };
 
   await apiRequest<void>(
-    `/permissions/users/${userId}`,
+    `/permissions/roles/${encodeURIComponent(roleName)}`,
     {
       method: "PUT",
       body: JSON.stringify(request),

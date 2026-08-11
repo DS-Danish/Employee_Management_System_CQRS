@@ -1,11 +1,13 @@
+using Microsoft.AspNetCore.Identity;
+
 namespace EmployeeManagement.Infrastructure.Identity;
 
-public sealed class UserPermission
+public sealed class RolePermission
 {
-    public string UserId { get; set; } =
+    public string RoleId { get; set; } =
         string.Empty;
 
-    public ApplicationUser User { get; set; } =
+    public IdentityRole Role { get; set; } =
         null!;
 
     public int PermissionId { get; set; }

@@ -1,26 +1,26 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
+import { useNavigate } from "react-router-dom";
 
 import ApartmentIcon from "@mui/icons-material/Apartment";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import GroupsIcon from "@mui/icons-material/Groups";
-import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import InsightsIcon from "@mui/icons-material/Insights";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import SecurityIcon from "@mui/icons-material/Security";
 import WorkIcon from "@mui/icons-material/Work";
 
 import {
   Alert,
+  Autocomplete,
   Avatar,
   Box,
   Button,
   Card,
-  CardActionArea,
   CardContent,
   CircularProgress,
   Container,
@@ -29,33 +29,35 @@ import {
   Paper,
   Skeleton,
   Stack,
+  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 import {
-  useNavigate,
-} from "react-router-dom";
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip as ChartTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
+import { getDepartments } from "../services/departmentService";
+import { getEmployees } from "../services/employeeService";
+import { getProjects } from "../services/projectService";
 import {
-  getDepartments,
-} from "../services/departmentService";
-
-import {
-  getEmployees,
-} from "../services/employeeService";
-
-import {
-  getProjects,
-} from "../services/projectService";
-
-import {
+  approveLeave,
   getPendingLeaves,
+  rejectLeave,
 } from "../services/leaveService";
 
-import type {
-  StoredUser,
-} from "../Types/auth";
+import type { StoredUser } from "../Types/auth";
 
 interface DashboardStatistics {
   employees: number;
@@ -64,803 +66,854 @@ interface DashboardStatistics {
   pendingLeaves: number;
 }
 
+interface CategoryConfig {
+  key: keyof DashboardStatistics;
+  label: string;
+  color: string;
+  icon: ReactNode;
+}
+
+type InsightFilter = "all" | keyof DashboardStatistics;
+
+interface InsightOption {
+  key: InsightFilter;
+  label: string;
+}
+
+// One accent color per record type. Reused across the stat cards,
+// the header KPI strip, and both charts so everything reads as one system.
+const CATEGORY_CONFIG: CategoryConfig[] = [
+  { key: "employees", label: "Employees", color: "#4F46E5", icon: <GroupsIcon /> },
+  { key: "departments", label: "Departments", color: "#0D9488", icon: <ApartmentIcon /> },
+  { key: "projects", label: "Projects", color: "#7C3AED", icon: <WorkIcon /> },
+  { key: "pendingLeaves", label: "Pending Leaves", color: "#D97706", icon: <EventAvailableIcon /> },
+];
+
+const INSIGHT_OPTIONS: InsightOption[] = [
+  { key: "all", label: "All" },
+  ...CATEGORY_CONFIG.map((category: CategoryConfig) => ({
+    key: category.key,
+    label: category.label,
+  })),
+];
+
 interface SummaryCardProps {
   title: string;
   value: number;
   loading: boolean;
   icon: ReactNode;
+  color: string;
 }
 
-interface ManagementCardProps {
-  title: string;
-  description: string;
-  buttonLabel: string;
-  path: string;
-  icon: ReactNode;
-}
 
-export default function SuperAdminDashboardPage():
-React.ReactElement {
-  const currentUser:
-    StoredUser | null =
-    getStoredUser();
+export default function SuperAdminDashboardPage(): React.ReactElement {
+  const navigate = useNavigate();
+  const currentUser: StoredUser | null = getStoredUser();
 
-  const [
-    statistics,
-    setStatistics,
-  ] =
-    useState<DashboardStatistics>({
-      employees: 0,
-      departments: 0,
-      projects: 0,
-      pendingLeaves: 0,
-    });
+  const [statistics, setStatistics] = useState<DashboardStatistics>({
+    employees: 0,
+    departments: 0,
+    projects: 0,
+    pendingLeaves: 0,
+  });
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>("");
+  const [insightFilter, setInsightFilter] = useState<InsightFilter>("all");
+  const [pendingLeaveItems, setPendingLeaveItems] = useState<
+    Record<string, unknown>[]
+  >([]);
+  const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
+  const [leaveActionError, setLeaveActionError] = useState<string>("");
 
-  const [
-    error,
-    setError,
-  ] =
-    useState<string>("");
+  const loadDashboard = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    setError("");
 
-  const loadDashboard =
-    useCallback(
-      async (): Promise<void> => {
-        setLoading(true);
-        setError("");
+    try {
+      const [employees, departments, projects, pendingLeaves] = await Promise.all([
+        getEmployees(),
+        getDepartments(),
+        getProjects(),
+        getPendingLeaves(),
+      ]);
 
-        try {
-          const [
-            employees,
-            departments,
-            projects,
-            pendingLeaves,
-          ] =
-            await Promise.all([
-              getEmployees(),
-              getDepartments(),
-              getProjects(),
-              getPendingLeaves(),
-            ]);
+      setStatistics({
+        employees: employees.length,
+        departments: departments.length,
+        projects: projects.length,
+        pendingLeaves: pendingLeaves.length,
+      });
 
-          setStatistics({
-            employees:
-              employees.length,
+      setPendingLeaveItems(
+        pendingLeaves.map(
+          (leave: unknown): Record<string, unknown> =>
+            leave as Record<string, unknown>,
+        ),
+      );
 
-            departments:
-              departments.length,
+    } catch (caughtError: unknown) {
+      const message: string =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to load dashboard information.";
 
-            projects:
-              projects.length,
-
-            pendingLeaves:
-              pendingLeaves.length,
-          });
-        } catch (
-          caughtError: unknown
-        ) {
-          const message:
-            string =
-            caughtError instanceof Error
-              ? caughtError.message
-              : "Unable to load dashboard information.";
-
-          setError(
-            message,
-          );
-        } finally {
-          setLoading(
-            false,
-          );
-        }
-      },
-      [],
-    );
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
 
+  const handleLeaveReview = useCallback(
+    async (
+      leave: Record<string, unknown>,
+      action: "approve" | "reject",
+    ): Promise<void> => {
+      const leaveRequestId: string | null = getTextValue(leave, [
+        "id",
+        "leaveRequestId",
+        "requestId",
+      ]);
+
+      if (!leaveRequestId) {
+        setLeaveActionError("Unable to identify this leave request.");
+        return;
+      }
+
+      setReviewingLeaveId(leaveRequestId);
+      setLeaveActionError("");
+
+      try {
+        if (action === "approve") {
+          await approveLeave(leaveRequestId);
+        } else {
+          // The reject API requires a non-empty comment.
+          await rejectLeave(leaveRequestId, "Rejected by Super Admin");
+        }
+
+        await loadDashboard();
+      } catch (actionError: unknown) {
+        setLeaveActionError(
+          actionError instanceof Error
+            ? actionError.message
+            : `Unable to ${action} leave request.`,
+        );
+      } finally {
+        setReviewingLeaveId(null);
+      }
+    },
+    [loadDashboard],
+  );
+
+  const chartData = useMemo(
+    () =>
+      CATEGORY_CONFIG.map((category) => ({
+        name: category.label,
+        value: statistics[category.key],
+        color: category.color,
+      })),
+    [statistics],
+  );
+
+  const totalRecords: number =
+    statistics.employees + statistics.departments + statistics.projects + statistics.pendingLeaves;
+
+  const selectedInsightOption: InsightOption =
+    INSIGHT_OPTIONS.find(
+      (option: InsightOption): boolean => option.key === insightFilter,
+    ) ?? INSIGHT_OPTIONS[0];
+
+  const insightChartData =
+    insightFilter === "all"
+      ? chartData
+      : chartData.filter(
+          (_entry, index: number): boolean =>
+            CATEGORY_CONFIG[index]?.key === insightFilter,
+        );
+
+  const insightTotalRecords: number =
+    insightFilter === "all"
+      ? totalRecords
+      : statistics[insightFilter];
+
   return (
-    <Box
-      sx={{
-        bgcolor: "#F8FAFC",
-        minHeight: "100%",
-      }}
-    >
-      <Container
-        maxWidth="xl"
-        sx={{
-          py: {
-            xs: 3,
-            md: 5,
-          },
-        }}
-      >
+    <Box sx={{ bgcolor: "#F5F7FB", minHeight: "100%" }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}>
         <Stack spacing={4}>
-          {/* =====================
-              HEADER
-              ===================== */}
-
-          <Paper
-            elevation={0}
-            sx={{
-              p: {
-                xs: 3,
-                md: 4,
-              },
-
-              borderRadius: 3,
-
-              background:
-                "linear-gradient(135deg, #1976d2 0%, #512da8 100%)",
-
-              color:
-                "common.white",
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-
-                justifyContent:
-                  "space-between",
-
-                alignItems: {
-                  xs: "flex-start",
-                  sm: "center",
-                },
-
-                flexDirection: {
-                  xs: "column",
-                  sm: "row",
-                },
-
-                gap: 2,
-              }}
-            >
-              <Box>
-                <Typography
-                  variant="overline"
-                  sx={{
-                    opacity: 0.8,
-                    letterSpacing: 1.5,
-                  }}
-                >
-                  Employee Management
-                  System
-                </Typography>
-
-                <Typography
-                  variant="h4"
-                  sx={{
-                    fontWeight: 700,
-                    mt: 0.5,
-                  }}
-                >
-                  Super Admin Dashboard
-                </Typography>
-
-                <Typography
-                  sx={{
-                    mt: 1,
-                    opacity: 0.9,
-                    maxWidth: 700,
-                  }}
-                >
-                  Welcome back,{" "}
-                  {currentUser?.fullName ??
-                    "Super Admin"}.
-                  Manage employees,
-                  departments, projects,
-                  leave requests, user access
-                  and permissions from one
-                  place.
-                </Typography>
-              </Box>
-
-              <Tooltip
-                title="Refresh dashboard"
-              >
-                <span>
-                  <IconButton
-                    disabled={
-                      loading
-                    }
-                    onClick={() =>
-                      void loadDashboard()
-                    }
-                    sx={{
-                      bgcolor:
-                        "rgba(255,255,255,0.12)",
-
-                      color:
-                        "common.white",
-
-                      "&:hover": {
-                        bgcolor:
-                          "rgba(255,255,255,0.20)",
-                      },
-                    }}
-                  >
-                    {loading ? (
-                      <CircularProgress
-                        size={22}
-                        color="inherit"
-                      />
-                    ) : (
-                      <RefreshIcon />
-                    )}
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </Box>
-          </Paper>
+          <DashboardHeader
+            fullName={currentUser?.fullName}
+            loading={loading}
+            onRefresh={() => void loadDashboard()}
+          />
 
           {error && (
-            <Alert
-              severity="error"
-              onClose={() =>
-                setError("")
-              }
-              sx={{
-                borderRadius: 2,
-              }}
-            >
+            <Alert severity="error" onClose={() => setError("")} sx={{ borderRadius: 2 }}>
               {error}
             </Alert>
           )}
 
-          {/* =====================
-              OVERVIEW
-              ===================== */}
+          <SectionHeading title="Overview" subtitle="Current system information." />
 
-          <Box>
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: 700,
-              }}
-            >
-              Overview
-            </Typography>
-
-            <Typography
-              color="text.secondary"
-              sx={{
-                mt: 0.5,
-              }}
-            >
-              Current system
-              information.
-            </Typography>
-          </Box>
-
-          <Grid
-            container
-            spacing={3}
-          >
-            <Grid
-              size={{
-                xs: 12,
-                sm: 6,
-                lg: 3,
-              }}
-            >
-              <SummaryCard
-                title="Employees"
-                value={
-                  statistics.employees
-                }
-                loading={loading}
-                icon={
-                  <GroupsIcon />
-                }
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                sm: 6,
-                lg: 3,
-              }}
-            >
-              <SummaryCard
-                title="Departments"
-                value={
-                  statistics.departments
-                }
-                loading={loading}
-                icon={
-                  <ApartmentIcon />
-                }
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                sm: 6,
-                lg: 3,
-              }}
-            >
-              <SummaryCard
-                title="Projects"
-                value={
-                  statistics.projects
-                }
-                loading={loading}
-                icon={
-                  <WorkIcon />
-                }
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                sm: 6,
-                lg: 3,
-              }}
-            >
-              <SummaryCard
-                title="Pending Leaves"
-                value={
-                  statistics.pendingLeaves
-                }
-                loading={loading}
-                icon={
-                  <EventAvailableIcon />
-                }
-              />
-            </Grid>
+          <Grid container spacing={3}>
+            {CATEGORY_CONFIG.map((category) => (
+              <Grid key={category.key} size={{ xs: 12, sm: 6, lg: 3 }}>
+                <SummaryCard
+                  title={category.label}
+                  value={statistics[category.key]}
+                  loading={loading}
+                  icon={category.icon}
+                  color={category.color}
+                />
+              </Grid>
+            ))}
           </Grid>
 
-          {/* =====================
-              ADMINISTRATION
-              ===================== */}
-
-          <Box>
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: 700,
-              }}
-            >
-              Administration
-            </Typography>
-
-            <Typography
-              color="text.secondary"
-              sx={{
-                mt: 0.5,
-              }}
-            >
-              Access administrative
-              features of the system.
-            </Typography>
-          </Box>
-
-          <Grid
-            container
-            spacing={3}
-          >
-            <Grid
-              size={{
-                xs: 12,
-                sm: 6,
-                lg: 4,
-              }}
-            >
-              <ManagementCard
-                title="Employees"
-                description="Create, view, update and delete employee records."
-                buttonLabel="Manage employees"
-                path="/super-admin/employees"
-                icon={
-                  <GroupsIcon />
-                }
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                sm: 6,
-                lg: 4,
-              }}
-            >
-              <ManagementCard
-                title="Departments"
-                description="Create and maintain departments across the organisation."
-                buttonLabel="Manage departments"
-                path="/super-admin/departments"
-                icon={
-                  <ApartmentIcon />
-                }
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                sm: 6,
-                lg: 4,
-              }}
-            >
-              <ManagementCard
-                title="Projects"
-                description="Manage projects and employee project assignments."
-                buttonLabel="Manage projects"
-                path="/super-admin/projects"
-                icon={
-                  <WorkIcon />
-                }
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                sm: 6,
-                lg: 4,
-              }}
-            >
-              <ManagementCard
-                title="Leave Requests"
-                description="Review pending leave applications from employees and team leads."
-                buttonLabel="Review leave requests"
-                path="/super-admin/leave-requests"
-                icon={
-                  <EventAvailableIcon />
-                }
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                sm: 6,
-                lg: 4,
-              }}
-            >
-              <ManagementCard
-                title="User Access"
-                description="Create user accounts and assign application roles."
-                buttonLabel="Create user"
-                path="/super-admin/users/create"
-                icon={
-                  <ManageAccountsIcon />
-                }
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                sm: 6,
-                lg: 4,
-              }}
-            >
-              <ManagementCard
-                title="Permissions"
-                description="Assign application permissions to employees and team leads."
-                buttonLabel="Manage permissions"
-                path="/super-admin/permissions"
-                icon={
-                  <SecurityIcon />
-                }
-              />
-            </Grid>
-          </Grid>
-
-          {/* =====================
-              ACCOUNT INFORMATION
-              ===================== */}
-
-          <Paper
-            elevation={0}
+          <Box
             sx={{
-              p: 3,
-              borderRadius: 3,
-              border:
-                "1px solid",
-
-              borderColor:
-                "divider",
+              display: "flex",
+              alignItems: { xs: "stretch", sm: "center" },
+              justifyContent: "space-between",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2,
             }}
           >
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                mb: 2.5,
+            <SectionHeading title="Insights" subtitle="How records break down across the system." />
+
+            <Autocomplete
+              size="small"
+              disableClearable
+              options={INSIGHT_OPTIONS}
+              value={selectedInsightOption}
+              getOptionLabel={(option: InsightOption): string => option.label}
+              isOptionEqualToValue={(
+                option: InsightOption,
+                value: InsightOption,
+              ): boolean => option.key === value.key}
+              onChange={(_event, value: InsightOption): void => {
+                setInsightFilter(value.key);
               }}
-            >
-              Account Information
-            </Typography>
+              sx={{ width: { xs: "100%", sm: 260 } }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Search insights"
+                  placeholder="Select module"
+                />
+              )}
+            />
+          </Box>
 
-            <Grid
-              container
-              spacing={3}
-            >
-              <Grid
-                size={{
-                  xs: 12,
-                  md: 4,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                >
-                  Full name
-                </Typography>
-
-                <Typography
-                  sx={{
-                    fontWeight: 600,
-                  }}
-                >
-                  {currentUser?.fullName ??
-                    "Not available"}
-                </Typography>
-              </Grid>
-
-              <Grid
-                size={{
-                  xs: 12,
-                  md: 4,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                >
-                  Email
-                </Typography>
-
-                <Typography
-                  sx={{
-                    fontWeight: 600,
-                    wordBreak:
-                      "break-word",
-                  }}
-                >
-                  {currentUser?.email ??
-                    "Not available"}
-                </Typography>
-              </Grid>
-
-              <Grid
-                size={{
-                  xs: 12,
-                  md: 4,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                >
-                  Role
-                </Typography>
-
-                <Typography
-                  sx={{
-                    fontWeight: 600,
-                  }}
-                >
-                  {currentUser?.role ??
-                    "SuperAdmin"}
-                </Typography>
-              </Grid>
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, lg: 7 }}>
+              <ChartCard title="Records by category" icon={<InsightsIcon fontSize="small" />}>
+                {loading ? (
+                  <Skeleton variant="rounded" height={280} />
+                ) : insightTotalRecords === 0 ? (
+                  <EmptyChartState message="No records yet. Data will appear here once employees, departments, projects or leave requests are added." />
+                ) : (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={insightChartData} barSize={40}>
+                      <CartesianGrid vertical={false} stroke={alpha("#0B1120", 0.06)} />
+                      <XAxis
+                        dataKey="name"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 12, fill: "#64748B" }}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 12, fill: "#64748B" }}
+                        width={28}
+                      />
+                      <ChartTooltip
+                        cursor={{ fill: alpha("#0B1120", 0.04) }}
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid #E2E8F0",
+                          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.08)",
+                        }}
+                      />
+                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                        {insightChartData.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </ChartCard>
             </Grid>
-          </Paper>
+
+            <Grid size={{ xs: 12, lg: 5 }}>
+              <ChartCard title="Share of total" icon={<InsightsIcon fontSize="small" />}>
+                {loading ? (
+                  <Skeleton variant="rounded" height={280} />
+                ) : insightTotalRecords === 0 ? (
+                  <EmptyChartState message="Nothing to show yet." />
+                ) : (
+                  <Box sx={{ position: "relative" }}>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <PieChart>
+                        <Pie
+                          data={insightChartData}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={70}
+                          outerRadius={100}
+                          paddingAngle={3}
+                          stroke="none"
+                        >
+                          {insightChartData.map((entry) => (
+                            <Cell key={entry.name} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <ChartTooltip
+                          contentStyle={{
+                            borderRadius: 12,
+                            border: "1px solid #E2E8F0",
+                            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.08)",
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        textAlign: "center",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      <Typography variant="h4" sx={{ fontWeight: 800, color: "#0B1120" }}>
+                        {insightTotalRecords}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#64748B" }}>
+                        total records
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+
+                <Stack
+                  direction="row"
+                  sx={{
+                    gap: 1,
+                    mb: 2,
+                    alignItems: "center",
+                  }}
+                >
+                  {CATEGORY_CONFIG.filter(
+                    (category: CategoryConfig): boolean =>
+                      insightFilter === "all" || category.key === insightFilter,
+                  ).map((category) => (
+                    <Stack
+                      key={category.key}
+                      direction="row"
+                      spacing={0.75}
+                      sx={{ alignItems: "center" }}
+                    >
+                      <Box sx={{ width: 10, height: 10, borderRadius: "3px", bgcolor: category.color }} />
+                      <Typography variant="caption" sx={{ color: "#64748B" }}>
+                        {category.label}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              </ChartCard>
+            </Grid>
+          </Grid>
+
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: { xs: "flex-start", sm: "center" },
+              justifyContent: "space-between",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2,
+            }}
+          >
+            <SectionHeading
+              title="Pending Leaves"
+              subtitle="Latest leave requests waiting for review."
+            />
+
+            {pendingLeaveItems.length > 5 && (
+              <Button
+                type="button"
+                variant="outlined"
+                onClick={() => navigate("/super-admin/leave-requests")}
+                sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
+              >
+                See more
+              </Button>
+            )}
+          </Box>
+
+          {leaveActionError && (
+            <Alert severity="error" onClose={() => setLeaveActionError("")}>
+              {leaveActionError}
+            </Alert>
+          )}
+
+          <Card
+            sx={{
+              borderRadius: 3,
+              border: 1,
+              borderColor: "divider",
+              boxShadow: "none",
+              overflow: "hidden",
+            }}
+          >
+            {loading ? (
+              <Box sx={{ p: 3 }}>
+                <Stack spacing={1.5}>
+                  {Array.from({ length: 3 }).map((_, index: number) => (
+                    <Skeleton key={index} variant="rounded" height={64} />
+                  ))}
+                </Stack>
+              </Box>
+            ) : pendingLeaveItems.length === 0 ? (
+              <Box
+                sx={{
+                  py: 6,
+                  px: 3,
+                  textAlign: "center",
+                  color: "text.secondary",
+                }}
+              >
+                <EventAvailableIcon sx={{ fontSize: 42, mb: 1, color: "#D97706" }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#0B1120" }}>
+                  No pending leave requests
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                  New pending requests will appear here.
+                </Typography>
+              </Box>
+            ) : (
+              <Stack divider={<Box sx={{ borderTop: "1px solid #E2E8F0" }} />}>
+                {pendingLeaveItems.slice(0, 5).map(
+                  (leave: Record<string, unknown>, index: number) => (
+                    <Box
+                      key={getLeaveKey(leave, index)}
+                      sx={{
+                        px: { xs: 2, sm: 3 },
+                        py: 2,
+                        display: "flex",
+                        alignItems: { xs: "flex-start", md: "center" },
+                        justifyContent: "space-between",
+                        flexDirection: { xs: "column", md: "row" },
+                        gap: 2,
+                      }}
+                    >
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                        <Avatar
+                          sx={{
+                            width: 42,
+                            height: 42,
+                            bgcolor: alpha("#D97706", 0.12),
+                            color: "#D97706",
+                          }}
+                        >
+                          <EventAvailableIcon fontSize="small" />
+                        </Avatar>
+
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                            {getLeaveEmployeeLabel(leave)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {getLeaveTypeLabel(leave)}
+                          </Typography>
+                        </Box>
+                      </Stack>
+
+                      <Stack
+                        direction={{ xs: "column", lg: "row" }}
+                        spacing={{ xs: 1.5, lg: 3 }}
+                        sx={{
+                          minWidth: { lg: 520 },
+                          alignItems: { xs: "stretch", lg: "center" },
+                        }}
+                      >
+                        <Box sx={{ minWidth: 170 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Leave period
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {getLeavePeriod(leave)}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ minWidth: 70 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Status
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 700, color: "#D97706" }}
+                          >
+                            {getTextValue(leave, ["status"]) ?? "Pending"}
+                          </Typography>
+                        </Box>
+
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            type="button"
+                            size="small"
+                            variant="contained"
+                            disabled={
+                              reviewingLeaveId === getLeaveRequestId(leave)
+                            }
+                            onClick={() => void handleLeaveReview(leave, "approve")}
+                            sx={{
+                              textTransform: "none",
+                              fontWeight: 700,
+                              borderRadius: 2,
+                            }}
+                          >
+                            {reviewingLeaveId === getLeaveRequestId(leave)
+                              ? "Processing..."
+                              : "Approve"}
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            disabled={
+                              reviewingLeaveId === getLeaveRequestId(leave)
+                            }
+                            onClick={() => void handleLeaveReview(leave, "reject")}
+                            sx={{
+                              textTransform: "none",
+                              fontWeight: 700,
+                              borderRadius: 2,
+                            }}
+                          >
+                            Reject
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    </Box>
+                  ),
+                )}
+              </Stack>
+            )}
+          </Card>
         </Stack>
       </Container>
     </Box>
   );
 }
 
-function SummaryCard({
-  title,
-  value,
+interface DashboardHeaderProps {
+  fullName?: string;
+  loading: boolean;
+  onRefresh: () => void;
+}
+
+function DashboardHeader({
+  fullName,
   loading,
+  onRefresh,
+}: DashboardHeaderProps): React.ReactElement {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        position: "relative",
+        overflow: "hidden",
+        p: { xs: 3, md: 4 },
+        borderRadius: 3,
+        background: "linear-gradient(120deg, #0B1120 0%, #1E1B4B 55%, #4F46E5 100%)",
+        color: "common.white",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          backgroundImage: "radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)",
+          backgroundSize: "18px 18px",
+          opacity: 0.5,
+          pointerEvents: "none",
+        },
+      }}
+    >
+      <Box sx={{ position: "relative" }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: { xs: "flex-start", sm: "center" },
+            flexDirection: { xs: "column", sm: "row" },
+            gap: 2,
+          }}
+        >
+          <Box>
+            <Typography variant="overline" sx={{ opacity: 0.75, letterSpacing: 2 }}>
+              Employee Management System
+            </Typography>
+
+            <Typography variant="h4" sx={{ fontWeight: 800, mt: 0.5 }}>
+              Super Admin Dashboard
+            </Typography>
+
+            <Typography sx={{ mt: 1, opacity: 0.85, maxWidth: 640 }}>
+              Welcome back, {fullName ?? "Super Admin"}. Manage employees, departments, projects,
+              leave requests, user access and permissions from one place.
+            </Typography>
+          </Box>
+
+          <Tooltip title="Refresh dashboard">
+            <span>
+              <IconButton
+                disabled={loading}
+                onClick={onRefresh}
+                sx={{
+                  bgcolor: "rgba(255,255,255,0.12)",
+                  color: "common.white",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.20)" },
+                }}
+              >
+                {loading ? <CircularProgress size={22} color="inherit" /> : <RefreshIcon />}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+
+      </Box>
+    </Paper>
+  );
+}
+
+function SectionHeading({ title, subtitle }: { title: string; subtitle: string }): React.ReactElement {
+  return (
+    <Box>
+      <Typography variant="h5" sx={{ fontWeight: 700, color: "#0B1120" }}>
+        {title}
+      </Typography>
+      <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+        {subtitle}
+      </Typography>
+    </Box>
+  );
+}
+
+function ChartCard({
+  title,
   icon,
-}: SummaryCardProps):
-React.ReactElement {
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  children: ReactNode;
+}): React.ReactElement {
+  return (
+    <Card sx={{ height: "100%", borderRadius: 3, border: 1, borderColor: "divider", boxShadow: "none" }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ mb: 2, alignItems: "center" }}
+>
+          <Box sx={{ color: "#4F46E5", display: "flex" }}>{icon}</Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            {title}
+          </Typography>
+        </Stack>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmptyChartState({ message }: { message: string }): React.ReactElement {
+  return (
+    <Box
+      sx={{
+        height: 280,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        color: "text.secondary",
+        px: 4,
+      }}
+    >
+      <Typography variant="body2">{message}</Typography>
+    </Box>
+  );
+}
+
+function SummaryCard({ title, value, loading, icon, color }: SummaryCardProps): React.ReactElement {
   return (
     <Card
       sx={{
         height: "100%",
         borderRadius: 3,
         border: 1,
-        borderColor:
-          "divider",
+        borderColor: "divider",
         boxShadow: "none",
+        borderLeft: `3px solid ${color}`,
       }}
     >
-      <CardContent
-        sx={{
-          p: 3,
-          display: "flex",
-          alignItems:
-            "center",
-          gap: 2,
-        }}
-      >
-        <Avatar
-          sx={{
-            width: 52,
-            height: 52,
-            bgcolor:
-              "primary.main",
-          }}
-        >
-          {icon}
-        </Avatar>
+      <CardContent sx={{ p: 3, display: "flex", alignItems: "center", gap: 2 }}>
+        <Avatar sx={{ width: 52, height: 52, bgcolor: alpha(color, 0.12), color }}>{icon}</Avatar>
 
         <Box>
           {loading ? (
-            <Skeleton
-              width={60}
-              height={38}
-            />
+            <Skeleton width={60} height={38} />
           ) : (
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 700,
-              }}
-            >
+            <Typography variant="h4" sx={{ fontWeight: 700, color: "#0B1120" }}>
               {value}
             </Typography>
           )}
 
-          <Typography
-            color="text.secondary"
-          >
-            {title}
-          </Typography>
+          <Typography color="text.secondary">{title}</Typography>
         </Box>
       </CardContent>
     </Card>
   );
 }
 
-function ManagementCard({
-  title,
-  description,
-  buttonLabel,
-  path,
-  icon,
-}: ManagementCardProps):
-React.ReactElement {
-  const navigate =
-    useNavigate();
 
+function getTextValue(
+  record: Record<string, unknown>,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value: unknown = record[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+
+    if (typeof value === "number") {
+      return String(value);
+    }
+  }
+
+  return null;
+}
+
+function getLeaveRequestId(
+  leave: Record<string, unknown>,
+): string | null {
+  return getTextValue(leave, ["id", "leaveRequestId", "requestId"]);
+}
+
+function getLeaveKey(
+  leave: Record<string, unknown>,
+  index: number,
+): string {
   return (
-    <Card
-      sx={{
-        height: "100%",
-        borderRadius: 3,
-        border: 1,
-        borderColor:
-          "divider",
-        boxShadow: "none",
-
-        transition:
-          "transform 0.2s ease, box-shadow 0.2s ease",
-
-        "&:hover": {
-          transform:
-            "translateY(-3px)",
-
-          boxShadow: 3,
-        },
-      }}
-    >
-      <CardActionArea
-        onClick={() =>
-          navigate(path)
-        }
-        sx={{
-          height: "100%",
-        }}
-      >
-        <CardContent
-          sx={{
-            p: 3,
-            height: "100%",
-
-            display:
-              "flex",
-
-            flexDirection:
-              "column",
-          }}
-        >
-          <Avatar
-            sx={{
-              bgcolor:
-                "primary.main",
-
-              mb: 2,
-            }}
-          >
-            {icon}
-          </Avatar>
-
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: 700,
-            }}
-          >
-            {title}
-          </Typography>
-
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{
-              mt: 1,
-              mb: 3,
-              flexGrow: 1,
-            }}
-          >
-            {description}
-          </Typography>
-
-          <Button
-            type="button"
-            endIcon={
-              <ArrowForwardIcon />
-            }
-            sx={{
-              alignSelf:
-                "flex-start",
-
-              px: 0,
-            }}
-          >
-            {buttonLabel}
-          </Button>
-        </CardContent>
-      </CardActionArea>
-    </Card>
+    getTextValue(leave, ["id", "leaveRequestId", "requestId"]) ??
+    `pending-leave-${index}`
   );
 }
 
-function getStoredUser():
-StoredUser | null {
-  const storedUserJson:
-    | string
-    | null =
-    localStorage.getItem(
-      "authUser",
-    );
+function getLeaveEmployeeLabel(
+  leave: Record<string, unknown>,
+): string {
+  const directName: string | null = getTextValue(leave, [
+    "employeeName",
+    "fullName",
+    "name",
+  ]);
+
+  if (directName) {
+    return directName;
+  }
+
+  const employee: unknown = leave.employee;
+
+  if (employee && typeof employee === "object") {
+    const employeeRecord = employee as Record<string, unknown>;
+    const fullName: string | null = getTextValue(employeeRecord, [
+      "fullName",
+      "name",
+    ]);
+
+    if (fullName) {
+      return fullName;
+    }
+
+    const firstName: string | null = getTextValue(employeeRecord, ["firstName"]);
+    const lastName: string | null = getTextValue(employeeRecord, ["lastName"]);
+
+    if (firstName || lastName) {
+      return [firstName, lastName].filter(Boolean).join(" ");
+    }
+  }
+
+  const employeeId: string | null = getTextValue(leave, ["employeeId"]);
+  return employeeId ? `Employee #${employeeId}` : "Employee";
+}
+
+function getLeaveTypeLabel(
+  leave: Record<string, unknown>,
+): string {
+  return (
+    getTextValue(leave, [
+      "leaveType",
+      "policyName",
+      "leavePolicyName",
+      "reason",
+    ]) ?? "Leave request"
+  );
+}
+
+function getLeavePeriod(
+  leave: Record<string, unknown>,
+): string {
+  const start: string | null = getTextValue(leave, ["startDate"]);
+  const end: string | null = getTextValue(leave, ["endDate"]);
+
+  if (!start && !end) {
+    return "Date not available";
+  }
+
+  if (start && end) {
+    return `${formatLeaveDate(start)} – ${formatLeaveDate(end)}`;
+  }
+
+  return formatLeaveDate(start ?? end ?? "");
+}
+
+function formatLeaveDate(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getStoredUser(): StoredUser | null {
+  const storedUserJson: string | null = localStorage.getItem("authUser");
 
   if (!storedUserJson) {
     return null;
   }
 
   try {
-    const user =
-      JSON.parse(
-        storedUserJson,
-      ) as StoredUser;
+    const user = JSON.parse(storedUserJson) as StoredUser;
 
-    if (
-      user.role !==
-      "SuperAdmin"
-    ) {
+    if (user.role !== "SuperAdmin") {
       return null;
     }
 

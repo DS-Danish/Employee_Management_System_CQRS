@@ -4,13 +4,11 @@ export interface Permission {
   code: string;
 }
 
-export interface PermissionUser {
-  id: string;
+export interface PermissionRole {
   name: string;
-  email: string;
-  role: string;
+  displayName: string;
 }
 
-export interface UpdateUserPermissionsRequest {
+export interface UpdateRolePermissionsRequest {
   permissionIds: number[];
 }

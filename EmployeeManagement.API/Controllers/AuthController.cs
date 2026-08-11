@@ -122,17 +122,39 @@ public sealed class AuthController : ControllerBase
             GetPrimaryRole(
                 supportedRoles);
 
-        List<string> permissions =
+        List<string> normalizedRoleNames =
+            supportedRoles
+                .Select(
+                    role =>
+                        role.ToUpperInvariant())
+                .ToList();
+
+        List<string> roleIds =
             await _databaseContext
-                .UserPermissions
+                .Roles
                 .AsNoTracking()
                 .Where(
-                    userPermission =>
-                        userPermission.UserId ==
-                        user.Id)
+                    role =>
+                        role.NormalizedName != null &&
+                        normalizedRoleNames.Contains(
+                            role.NormalizedName))
                 .Select(
-                    userPermission =>
-                        userPermission
+                    role =>
+                        role.Id)
+                .ToListAsync(
+                    cancellationToken);
+
+        List<string> permissions =
+            await _databaseContext
+                .RolePermissions
+                .AsNoTracking()
+                .Where(
+                    rolePermission =>
+                        roleIds.Contains(
+                            rolePermission.RoleId))
+                .Select(
+                    rolePermission =>
+                        rolePermission
                             .Permission
                             .Code)
                 .Distinct()

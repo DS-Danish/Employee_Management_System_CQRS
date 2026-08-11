@@ -3,12 +3,18 @@ import {
   useEffect,
   useMemo,
   useState,
+  type MouseEvent,
 } from "react";
 
-import ManageAccountsIcon from
-  "@mui/icons-material/ManageAccounts";
-import RefreshIcon from
-  "@mui/icons-material/Refresh";
+
+import { useNavigate } from "react-router-dom";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import GroupsIcon from "@mui/icons-material/Groups";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
 import {
   Alert,
@@ -17,845 +23,762 @@ import {
   Button,
   CircularProgress,
   Container,
-  FormControl,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Divider,
   IconButton,
-  InputLabel,
+  ListItemIcon,
+  ListItemText,
+  Menu,
   MenuItem,
   Paper,
-  Select,
   Snackbar,
   Stack,
-  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
 
-import {
-  getAvailableEmployees,
-  registerUser,
-} from "../services/authService";
+import { CreateEmployeeModal } from "../Components/CreateEmployeeModal";
+import { EditEmployeeModal } from "../Components/EditEmployeeModal";
+import { EmployeeTable } from "../Components/EmployeeTable";
+
+import { getDepartments } from "../services/departmentService";
 
 import {
-  getDepartments,
-} from "../services/departmentService";
+  deleteEmployee,
+  getEmployeeDetail,
+  getEmployees,
+} from "../services/employeeService";
+
+import { getEmployeeProjects } from "../services/employeeProjectService";
+import { getProjects } from "../services/projectService";
+
+import type { Department } from "../Types/department";
 
 import type {
-  AvailableEmployee,
-  RegisterRequest,
-  UserRole,
-} from "../Types/auth";
+  Employee,
+  EmployeeDetail,
+} from "../Types/employee";
 
 import type {
-  Department,
-} from "../Types/department";
+  EmployeeProject,
+  Project,
+} from "../Types/project";
 
-export default function CreateUserPage():
-  React.ReactElement {
-  const [
-    fullName,
-    setFullName,
-  ] = useState<string>("");
 
-  const [
-    email,
-    setEmail,
-  ] = useState<string>("");
+export default function CreateUserPage(): React.ReactElement {
+  const navigate = useNavigate();
 
-  const [
-    password,
-    setPassword,
-  ] = useState<string>("");
+  const [employees, setEmployees] =
+    useState<Employee[]>([]);
 
-  const [
-    role,
-    setRole,
-  ] = useState<UserRole>(
-    "Employee",
+  const [departments, setDepartments] =
+    useState<Department[]>([]);
+
+  const [projects, setProjects] =
+    useState<Project[]>([]);
+
+  const [loading, setLoading] =
+    useState<boolean>(true);
+
+  const [createModalOpen, setCreateModalOpen] =
+    useState<boolean>(false);
+
+  const [editModalOpen, setEditModalOpen] =
+    useState<boolean>(false);
+
+  const [selectedEmployee, setSelectedEmployee] =
+    useState<Employee | null>(null);
+
+  const [menuAnchorElement, setMenuAnchorElement] =
+    useState<HTMLElement | null>(null);
+
+  const [deletingEmployeeId, setDeletingEmployeeId] =
+    useState<string | null>(null);
+
+  const [pendingDeletion, setPendingDeletion] =
+    useState<Employee | null>(null);
+
+  const [error, setError] = useState<string>("");
+
+  const [successMessage, setSuccessMessage] =
+    useState<string>("");
+
+  const loadEmployeeRelations = useCallback(
+    async (
+      employee: Employee,
+      allDepartments: Department[],
+      allProjects: Project[],
+    ): Promise<Employee> => {
+      const [projectResult, detailResult] =
+        await Promise.allSettled([
+          getEmployeeProjects(employee.id),
+
+          employee.employeeDetail
+            ? Promise.resolve(employee.employeeDetail)
+            : getEmployeeDetail(employee.id),
+        ]);
+
+      const employeeProjects: EmployeeProject[] =
+        projectResult.status === "fulfilled"
+          ? projectResult.value
+          : [];
+
+      const employeeDetail: EmployeeDetail | null =
+        detailResult.status === "fulfilled"
+          ? detailResult.value
+          : employee.employeeDetail ?? null;
+
+      const assignedProjects: Project[] =
+        employeeProjects
+          .map(
+            (
+              assignment: EmployeeProject,
+            ): Project | undefined =>
+              allProjects.find(
+                (project: Project): boolean =>
+                  project.id === assignment.projectId,
+              ),
+          )
+          .filter(
+            (
+              project: Project | undefined,
+            ): project is Project =>
+              project !== undefined,
+          );
+
+      const matchedDepartment:
+        | Department
+        | undefined = allDepartments.find(
+        (department: Department): boolean =>
+          department.id === employee.departmentId,
+      );
+
+      return {
+        ...employee,
+
+        department:
+          employee.department ??
+          matchedDepartment ??
+          null,
+
+        departmentName:
+          employee.departmentName ??
+          matchedDepartment?.name ??
+          null,
+
+        projects: assignedProjects,
+
+        employeeDetail,
+      };
+    },
+    [],
   );
 
-  const [
-    departmentId,
-    setDepartmentId,
-  ] = useState<string>("");
+  const loadData = useCallback(
+    async (): Promise<void> => {
+      setLoading(true);
+      setError("");
 
-  const [
-    employeeId,
-    setEmployeeId,
-  ] = useState<string>("");
+      try {
+        const [
+          employeeResponse,
+          departmentResponse,
+          projectResponse,
+        ] = await Promise.all([
+          getEmployees(),
+          getDepartments(),
+          getProjects(),
+        ]);
 
-  const [
-    departments,
-    setDepartments,
-  ] = useState<Department[]>([]);
-
-  const [
-    availableEmployees,
-    setAvailableEmployees,
-  ] = useState<
-    AvailableEmployee[]
-  >([]);
-
-  const [
-    loading,
-    setLoading,
-  ] = useState<boolean>(true);
-
-  const [
-    saving,
-    setSaving,
-  ] = useState<boolean>(false);
-
-  const [
-    error,
-    setError,
-  ] = useState<string>("");
-
-  const [
-    successMessage,
-    setSuccessMessage,
-  ] = useState<string>("");
-
-  const requiresEmployee: boolean =
-    role === "Employee" ||
-    role === "TeamLead";
-
-  const loadFormData =
-    useCallback(
-      async (): Promise<void> => {
-        setLoading(true);
-        setError("");
-
-        try {
-          const [
-            departmentResult,
-            employeeResult,
-          ] = await Promise.all([
-            getDepartments(),
-            getAvailableEmployees(),
-          ]);
-
-          setDepartments(
-            departmentResult,
+        const employeesWithRelations: Employee[] =
+          await Promise.all(
+            employeeResponse.map(
+              (employee: Employee) =>
+                loadEmployeeRelations(
+                  employee,
+                  departmentResponse,
+                  projectResponse,
+                ),
+            ),
           );
 
-          setAvailableEmployees(
-            employeeResult,
-          );
-        } catch (
-          caughtError: unknown
-        ) {
-          const message: string =
-            caughtError instanceof Error
-              ? caughtError.message
-              : "Unable to load user form data.";
+        setEmployees(employeesWithRelations);
+        setDepartments(departmentResponse);
+        setProjects(projectResponse);
+      } catch (caughtError: unknown) {
+        const message: string =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to load employee information.";
 
-          setError(message);
-        } finally {
-          setLoading(false);
-        }
-      },
-      [],
-    );
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadEmployeeRelations],
+  );
 
   useEffect(() => {
-    void loadFormData();
-  }, [loadFormData]);
+    void loadData();
+  }, [loadData]);
 
-  const employeesForSelectedDepartment:
-    AvailableEmployee[] =
-    useMemo(
-      (): AvailableEmployee[] => {
-        if (!departmentId) {
-          return [];
-        }
-
-        return availableEmployees.filter(
-          (
-            employee:
-              AvailableEmployee,
-          ): boolean =>
-            employee.departmentId ===
-            departmentId,
-        );
-      },
-      [
-        availableEmployees,
-        departmentId,
-      ],
-    );
-
-  function clearEmployeeSelection():
-    void {
-    setEmployeeId("");
-    setFullName("");
-    setEmail("");
+  function handleMenuOpen(
+    event: MouseEvent<HTMLButtonElement>,
+    employee: Employee,
+  ): void {
+    setMenuAnchorElement(event.currentTarget);
+    setSelectedEmployee(employee);
   }
 
-  function handleRoleChange(
-    selectedRole: UserRole,
-  ): void {
-    setRole(selectedRole);
-    setError("");
-
-    setDepartmentId("");
-    setEmployeeId("");
-    setFullName("");
-    setEmail("");
-
-    if (
-      selectedRole ===
-      "SuperAdmin"
-    ) {
-      setDepartmentId("");
-      setEmployeeId("");
-    }
+  function handleMenuClose(): void {
+    setMenuAnchorElement(null);
   }
 
-  function handleDepartmentChange(
-    selectedDepartmentId: string,
-  ): void {
-    setDepartmentId(
-      selectedDepartmentId,
-    );
-
-    clearEmployeeSelection();
-  }
-
-  function handleEmployeeChange(
-    selectedEmployeeId: string,
-  ): void {
-    setEmployeeId(
-      selectedEmployeeId,
-    );
-
-    const selectedEmployee:
-      AvailableEmployee | undefined =
-      availableEmployees.find(
-        (
-          employee:
-            AvailableEmployee,
-        ): boolean =>
-          employee.id ===
-          selectedEmployeeId,
-      );
-
+  function handleEditOpen(): void {
     if (!selectedEmployee) {
-      setFullName("");
-      setEmail("");
-
       return;
     }
 
-    setFullName(
-      selectedEmployee.fullName,
-    );
-
-    setEmail(
-      selectedEmployee.email,
-    );
-
-    if (
-      selectedEmployee.departmentId
-    ) {
-      setDepartmentId(
-        selectedEmployee.departmentId,
-      );
-    }
+    setMenuAnchorElement(null);
+    setEditModalOpen(true);
   }
 
-  function validateForm():
-    string | null {
-    if (!fullName.trim()) {
-      return "Full name is required.";
-    }
-
-    if (!email.trim()) {
-      return "Email is required.";
-    }
-
-    if (!password) {
-      return "Password is required.";
-    }
-
-    if (
-      password.length < 6
-    ) {
-      return (
-        "Password must contain at " +
-        "least 6 characters."
-      );
-    }
-
-    if (
-      requiresEmployee &&
-      !departmentId
-    ) {
-      return (
-        "Department is required " +
-        "for Employee and Team Lead accounts."
-      );
-    }
-
-    if (
-      requiresEmployee &&
-      !employeeId
-    ) {
-      return (
-        "Select an employee who " +
-        "does not already have a user account."
-      );
-    }
-
-    return null;
+  function handleEditClose(): void {
+    setEditModalOpen(false);
+    setSelectedEmployee(null);
   }
 
-  async function handleSubmit(
-    event:
-      React.FormEvent<HTMLFormElement>,
-  ): Promise<void> {
-    event.preventDefault();
+  async function handleEmployeeCreated(): Promise<void> {
+    setCreateModalOpen(false);
+    setSuccessMessage(
+      "Employee created successfully.",
+    );
 
+    await loadData();
+  }
+
+  async function handleEmployeeUpdated(): Promise<void> {
+    setEditModalOpen(false);
+    setSelectedEmployee(null);
+
+    setSuccessMessage(
+      "Employee updated successfully.",
+    );
+
+    await loadData();
+  }
+
+  function handleMenuDelete(): void {
+    if (!selectedEmployee) {
+      return;
+    }
+
+    setPendingDeletion(selectedEmployee);
+    setMenuAnchorElement(null);
+  }
+
+  function handleCancelDelete(): void {
+    if (deletingEmployeeId) {
+      return;
+    }
+
+    setPendingDeletion(null);
+    setSelectedEmployee(null);
+  }
+
+  async function handleConfirmDelete(): Promise<void> {
+    if (!pendingDeletion || deletingEmployeeId) {
+      return;
+    }
+
+    const employeeToDelete: Employee =
+      pendingDeletion;
+
+    setDeletingEmployeeId(employeeToDelete.id);
     setError("");
-
-    const validationError:
-      string | null =
-      validateForm();
-
-    if (validationError) {
-      setError(validationError);
-
-      return;
-    }
-
-    const request:
-      RegisterRequest = {
-      fullName:
-        fullName.trim(),
-
-      email:
-        email
-          .trim()
-          .toLowerCase(),
-
-      password,
-
-      role,
-
-      departmentId:
-        requiresEmployee
-          ? departmentId
-          : null,
-
-      employeeId:
-        requiresEmployee
-          ? employeeId
-          : null,
-    };
-
-    setSaving(true);
 
     try {
-      await registerUser(
-        request,
-      );
+      await deleteEmployee(employeeToDelete.id);
+
+      setPendingDeletion(null);
+      setSelectedEmployee(null);
 
       setSuccessMessage(
-        `${fullName.trim()} was created successfully.`,
+        "Employee deleted successfully.",
       );
 
-      setPassword("");
-      setDepartmentId("");
-      setEmployeeId("");
-      setFullName("");
-      setEmail("");
-      setRole("Employee");
-
-      const refreshedEmployees:
-        AvailableEmployee[] =
-        await getAvailableEmployees();
-
-      setAvailableEmployees(
-        refreshedEmployees,
-      );
-    } catch (
-      caughtError: unknown
-    ) {
+      await loadData();
+    } catch (caughtError: unknown) {
       const message: string =
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to create user.";
+          : "Unable to delete the employee.";
 
       setError(message);
     } finally {
-      setSaving(false);
+      setDeletingEmployeeId(null);
     }
   }
 
+  const pendingDeletionName: string = useMemo(
+    () =>
+      pendingDeletion
+        ? pendingDeletion.fullName?.trim() ||
+          pendingDeletion.email
+        : "",
+    [pendingDeletion],
+  );
+
+  const isDeletingPendingEmployee: boolean =
+    Boolean(
+      pendingDeletion &&
+        deletingEmployeeId === pendingDeletion.id,
+    );
+
   return (
-    <Box
-      sx={{
-        bgcolor: "#FAFAFA",
-        minHeight: "100%",
-      }}
-    >
-      <Container
-        maxWidth="md"
-        sx={{
-          py: {
-            xs: 3,
-            md: 5,
-          },
-        }}
-      >
+    <Box sx={{ bgcolor: "#F5F7FB", minHeight: "100%", py: { xs: 2, md: 3 } }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
         <Stack spacing={3}>
           <Paper
             elevation={0}
             sx={{
-              p: {
-                xs: 2.5,
-                sm: 3.5,
-              },
-              borderRadius: 3,
-              border:
-                "1px solid",
-              borderColor:
-                "divider",
+              p: { xs: 2.5, sm: 3.5 },
+              borderRadius: 4,
+              border: "1px solid",
+              borderColor: "divider",
               background:
-                "linear-gradient(135deg, #FFFFFF 0%, #F7F7FB 100%)",
+                "linear-gradient(135deg, #FFFFFF 0%, #F7F8FF 55%, #EEF2FF 100%)",
+              boxShadow: "0 10px 30px rgba(15, 23, 42, 0.06)",
+              overflow: "hidden",
+              position: "relative",
+              "&::after": {
+                content: '""',
+                position: "absolute",
+                width: 180,
+                height: 180,
+                borderRadius: "50%",
+                right: -70,
+                top: -90,
+                background: "rgba(79, 70, 229, 0.08)",
+              },
             }}
           >
             <Box
               sx={{
+                alignItems: {
+                  xs: "stretch",
+                  sm: "center",
+                },
                 display: "flex",
                 flexDirection: {
                   xs: "column",
                   sm: "row",
                 },
-                justifyContent:
-                  "space-between",
-                alignItems: {
-                  xs: "stretch",
-                  sm: "center",
-                },
+                justifyContent: "space-between",
                 gap: 2,
               }}
             >
-              <Stack
-                direction="row"
-                spacing={2}
-                sx={{
-                  alignItems:
-                    "center",
-                }}
-              >
-                <Avatar
+              <Box sx={{ position: "relative", zIndex: 1 }}>
+                <Typography
+                  variant="overline"
                   sx={{
-                    width: 54,
-                    height: 54,
-                    bgcolor:
-                      "primary.main",
+                    color: "#4F46E5",
+                    fontWeight: 800,
+                    letterSpacing: 1.2,
                   }}
                 >
-                  <ManageAccountsIcon />
-                </Avatar>
+                  Employee Records
+                </Typography>
 
-                <Box>
-                  <Typography
-                    component="h1"
-                    variant="h4"
-                    sx={{
-                      fontWeight: 700,
-                    }}
-                  >
-                    Create User
-                  </Typography>
+                <Typography
+                  component="h1"
+                  variant="h4"
+                  sx={{
+                    fontWeight: 800,
+                    letterSpacing: -0.8,
+                    color: "#0F172A",
+                  }}
+                >
+                  Employees
+                </Typography>
 
-                  <Typography
-                    color="text.secondary"
-                  >
-                    Create an application
-                    account and assign its
-                    access role.
-                  </Typography>
-                </Box>
-              </Stack>
+                <Typography
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  View, add, edit and manage employee information.
+                </Typography>
+              </Box>
 
-              <Tooltip title="Refresh available employees">
-                <span>
-                  <IconButton
-                    type="button"
-                    disabled={
-                      loading ||
-                      saving
-                    }
-                    onClick={() =>
-                      void loadFormData()
-                    }
-                    sx={{
-                      alignSelf: {
-                        xs:
-                          "flex-start",
-                        sm: "center",
-                      },
-                      border:
-                        "1px solid",
-                      borderColor:
-                        "divider",
-                    }}
-                  >
-                    {loading ? (
-                      <CircularProgress
-                        size={22}
-                      />
-                    ) : (
+              <Stack direction="row" spacing={1} sx={{ position: "relative", zIndex: 1, flexWrap: "wrap" }}>
+                <Tooltip title="Refresh">
+                  <span>
+                    <IconButton
+                      aria-label="Refresh employees"
+                      disabled={loading}
+                      onClick={() => void loadData()}
+                      sx={{
+                        border: "1px solid",
+                        borderColor: "divider",
+                        bgcolor: "background.paper",
+                        borderRadius: 2,
+                        boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+                        "&:hover": {
+                          bgcolor: "#F8FAFC",
+                        },
+                      }}
+                    >
                       <RefreshIcon />
-                    )}
-                  </IconButton>
-                </span>
-              </Tooltip>
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  startIcon={<ManageAccountsIcon />}
+                  onClick={() => navigate("/super-admin/users/create")}
+                  sx={{
+                    borderRadius: 2.5,
+                    px: 2.5,
+                    py: 1.05,
+                    fontWeight: 700,
+                    textTransform: "none",
+                    bgcolor: "background.paper",
+                  }}
+                >
+                  Create User
+                </Button>
+
+                <Button
+                    type="button"
+                    variant="contained"
+                    disableElevation
+                    startIcon={<AddIcon />}
+                    onClick={() =>
+                      setCreateModalOpen(true)
+                    }
+                    sx={{
+                      borderRadius: 2.5,
+                      px: 2.75,
+                      py: 1.05,
+                      fontWeight: 700,
+                      textTransform: "none",
+                      boxShadow: "0 6px 16px rgba(79, 70, 229, 0.22)",
+                    }}
+                  >
+                    Add employee
+                  </Button>
+              </Stack>
             </Box>
           </Paper>
 
           {error && (
             <Alert
               severity="error"
-              onClose={() =>
-                setError("")
-              }
-              sx={{
-                borderRadius: 2,
-              }}
+              onClose={() => setError("")}
+              sx={{ borderRadius: 2 }}
             >
               {error}
             </Alert>
           )}
 
-          <Paper
-            variant="outlined"
-            sx={{
-              p: {
-                xs: 2.5,
-                sm: 4,
-              },
-              borderRadius: 3,
-            }}
-          >
-            {loading ? (
-              <Box
+          {!loading && employees.length === 0 ? (
+            <Paper
+              variant="outlined"
+              sx={{
+                py: 8,
+                px: 3,
+                textAlign: "center",
+                borderRadius: 4,
+                borderStyle: "dashed",
+                borderColor: "#CBD5E1",
+                bgcolor: "background.paper",
+                boxShadow: "0 6px 20px rgba(15, 23, 42, 0.03)",
+              }}
+            >
+              <Avatar
                 sx={{
-                  py: 8,
-                  display: "flex",
-                  justifyContent:
-                    "center",
+                  width: 64,
+                  height: 64,
+                  mx: "auto",
+                  mb: 2,
+                  bgcolor: "#EEF2FF",
+                  color: "#4F46E5",
                 }}
               >
-                <CircularProgress />
-              </Box>
-            ) : (
-              <Box
-                component="form"
-                onSubmit={(
-                  event:
-                    React.FormEvent<HTMLFormElement>,
-                ) =>
-                  void handleSubmit(
-                    event,
-                  )
-                }
+                <GroupsIcon sx={{ fontSize: 32 }} />
+              </Avatar>
+
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 600 }}
               >
-                <Stack spacing={3}>
-                  <FormControl
-                    fullWidth
+                No employees yet
+              </Typography>
+
+              <Typography
+                color="text.secondary"
+                sx={{ mb: 3, maxWidth: 420, mx: "auto" }}
+              >
+                Add your first employee to start managing
+                employee records.
+              </Typography>
+              <Button
+                  type="button"
+                  variant="contained"
+                  disableElevation
+                  startIcon={<AddIcon />}
+                  onClick={() =>
+                    setCreateModalOpen(true)
+                  }
+                  sx={{ borderRadius: 2, px: 2.5 }}
+                >
+                  Add employee
+                </Button>
+            </Paper>
+          ) : (
+            <Paper
+              variant="outlined"
+              sx={{
+                borderRadius: 4,
+                overflow: "hidden",
+                borderColor: "#E2E8F0",
+                bgcolor: "background.paper",
+                boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
+              }}
+            >
+              <Box
+                sx={{
+                  px: { xs: 2, sm: 3 },
+                  py: 2.25,
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  display: "flex",
+                  alignItems: { xs: "flex-start", sm: "center" },
+                  justifyContent: "space-between",
+                  flexDirection: { xs: "column", sm: "row" },
+                  gap: 1,
+                }}
+              >
+                <Box>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 800, color: "#0F172A" }}
                   >
-                    <InputLabel>
-                      Role
-                    </InputLabel>
+                    All Employees
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Employee information currently available in the system.
+                  </Typography>
+                </Box>
 
-                    <Select
-                      label="Role"
-                      value={role}
-                      disabled={saving}
-                      onChange={(
-                        event,
-                      ) =>
-                        handleRoleChange(
-                          event.target
-                            .value as UserRole,
-                        )
-                      }
-                    >
-                      <MenuItem value="Employee">
-                        Employee
-                      </MenuItem>
-
-                      <MenuItem value="TeamLead">
-                        Team Lead
-                      </MenuItem>
-
-                      <MenuItem value="SuperAdmin">
-                        Super Admin
-                      </MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  {requiresEmployee && (
-                    <>
-                      <FormControl
-                        fullWidth
-                      >
-                        <InputLabel>
-                          Department
-                        </InputLabel>
-
-                        <Select
-                          label="Department"
-                          value={
-                            departmentId
-                          }
-                          disabled={saving}
-                          onChange={(
-                            event,
-                          ) =>
-                            handleDepartmentChange(
-                              event.target
-                                .value,
-                            )
-                          }
-                        >
-                          {departments.map(
-                            (
-                              department:
-                                Department,
-                            ) => (
-                              <MenuItem
-                                key={
-                                  department.id
-                                }
-                                value={
-                                  department.id
-                                }
-                              >
-                                {
-                                  department.name
-                                }
-                              </MenuItem>
-                            ),
-                          )}
-                        </Select>
-                      </FormControl>
-
-                      <FormControl
-                        fullWidth
-                        disabled={
-                          saving ||
-                          !departmentId
-                        }
-                      >
-                        <InputLabel>
-                          Employee
-                        </InputLabel>
-
-                        <Select
-                          label="Employee"
-                          value={
-                            employeeId
-                          }
-                          onChange={(
-                            event,
-                          ) =>
-                            handleEmployeeChange(
-                              event.target
-                                .value,
-                            )
-                          }
-                        >
-                          {employeesForSelectedDepartment.map(
-                            (
-                              employee:
-                                AvailableEmployee,
-                            ) => (
-                              <MenuItem
-                                key={
-                                  employee.id
-                                }
-                                value={
-                                  employee.id
-                                }
-                              >
-                                {employee.fullName}
-                                {" — "}
-                                {employee.email}
-                              </MenuItem>
-                            ),
-                          )}
-                        </Select>
-                      </FormControl>
-
-                      {departmentId &&
-                        employeesForSelectedDepartment
-                          .length ===
-                          0 && (
-                          <Alert
-                            severity="info"
-                            sx={{
-                              borderRadius:
-                                2,
-                            }}
-                          >
-                            All employees
-                            in this
-                            department
-                            already have
-                            user accounts,
-                            or no employees
-                            are assigned to
-                            it.
-                          </Alert>
-                        )}
-                    </>
-                  )}
-
-                  <TextField
-                    required
-                    fullWidth
-                    label="Full name"
-                    value={fullName}
-                    disabled={
-                      saving ||
-                      requiresEmployee
-                    }
-                    helperText={
-                      requiresEmployee
-                        ? "Filled automatically from the selected employee."
-                        : undefined
-                    }
-                    onChange={(
-                      event:
-                        React.ChangeEvent<HTMLInputElement>,
-                    ) =>
-                      setFullName(
-                        event.target
-                          .value,
-                      )
-                    }
-                  />
-
-                  <TextField
-                    required
-                    fullWidth
-                    type="email"
-                    label="Email"
-                    value={email}
-                    disabled={
-                      saving ||
-                      requiresEmployee
-                    }
-                    helperText={
-                      requiresEmployee
-                        ? "Filled automatically from the selected employee."
-                        : undefined
-                    }
-                    onChange={(
-                      event:
-                        React.ChangeEvent<HTMLInputElement>,
-                    ) =>
-                      setEmail(
-                        event.target
-                          .value,
-                      )
-                    }
-                  />
-
-                  <TextField
-                    required
-                    fullWidth
-                    type="password"
-                    label="Temporary password"
-                    value={password}
-                    disabled={saving}
-                    helperText="Use at least 6 characters and follow the configured password policy."
-                    onChange={(
-                      event:
-                        React.ChangeEvent<HTMLInputElement>,
-                    ) =>
-                      setPassword(
-                        event.target
-                          .value,
-                      )
-                    }
-                  />
-
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    size="large"
-                    disableElevation
-                    disabled={saving}
-                    startIcon={
-                      saving ? (
-                        <CircularProgress
-                          size={18}
-                          color="inherit"
-                        />
-                      ) : (
-                        <ManageAccountsIcon />
-                      )
-                    }
-                    sx={{
-                      alignSelf:
-                        "flex-start",
-                      px: 4,
-                      borderRadius: 2,
-                    }}
-                  >
-                    {saving
-                      ? "Creating..."
-                      : "Create user"}
-                  </Button>
-                </Stack>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    px: 1.5,
+                    py: 0.65,
+                    borderRadius: 999,
+                    bgcolor: "#EEF2FF",
+                    color: "#4F46E5",
+                    fontWeight: 700,
+                  }}
+                >
+                  {employees.length} {employees.length === 1 ? "employee" : "employees"}
+                </Typography>
               </Box>
-            )}
-          </Paper>
+
+              <EmployeeTable
+                employees={employees}
+                loading={loading}
+                deletingEmployeeId={deletingEmployeeId}
+                renderActions={(employee: Employee) => (
+                        <Tooltip title="Employee actions">
+                          <span>
+                            <IconButton
+                              aria-label={`Actions for ${
+                                employee.fullName ||
+                                employee.email
+                              }`}
+                              disabled={
+                                deletingEmployeeId ===
+                                employee.id
+                              }
+                              onClick={(
+                                event: MouseEvent<HTMLButtonElement>,
+                              ) =>
+                                handleMenuOpen(
+                                  event,
+                                  employee,
+                                )
+                              }
+                            >
+                              <MoreVertIcon />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
+              />
+            </Paper>
+          )}
         </Stack>
-      </Container>
 
-      <Snackbar
-        open={Boolean(
-          successMessage,
-        )}
-        autoHideDuration={4000}
-        onClose={(
-          _event,
-          reason,
-        ) => {
-          if (
-            reason ===
-            "clickaway"
-          ) {
-            return;
-          }
-
-          setSuccessMessage("");
-        }}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "right",
-        }}
-      >
-        <Alert
-          severity="success"
-          variant="filled"
-          onClose={() =>
-            setSuccessMessage("")
-          }
-          sx={{
-            width: "100%",
-            borderRadius: 2,
+        <Menu
+          anchorEl={menuAnchorElement}
+          open={Boolean(menuAnchorElement)}
+          onClose={handleMenuClose}
+          anchorOrigin={{
+            vertical: "bottom",
+            horizontal: "right",
+          }}
+          transformOrigin={{
+            vertical: "top",
+            horizontal: "right",
+          }}
+          slotProps={{
+            paper: {
+              sx: {
+                borderRadius: 2.5,
+                minWidth: 180,
+              },
+            },
           }}
         >
-          {successMessage}
-        </Alert>
-      </Snackbar>
+          <MenuItem onClick={handleEditOpen}>
+              <ListItemIcon>
+                <EditIcon fontSize="small" />
+              </ListItemIcon>
+
+              <ListItemText>
+                Edit employee
+              </ListItemText>
+            </MenuItem>
+          <Divider />
+
+              <MenuItem
+                disabled={
+                  selectedEmployee !== null &&
+                  deletingEmployeeId === selectedEmployee.id
+                }
+                onClick={handleMenuDelete}
+                sx={{ color: "error.main" }}
+              >
+                <ListItemIcon>
+                  <DeleteIcon
+                    fontSize="small"
+                    color="error"
+                  />
+                </ListItemIcon>
+
+                <ListItemText>
+                  Delete employee
+                </ListItemText>
+              </MenuItem>
+        </Menu>
+        <Dialog
+            open={Boolean(pendingDeletion)}
+            onClose={handleCancelDelete}
+            maxWidth="xs"
+            fullWidth
+            slotProps={{
+              paper: {
+                sx: {
+                  borderRadius: 3.5,
+                },
+              },
+            }}
+          >
+          <DialogTitle sx={{ fontWeight: 700 }}>
+            Delete employee?
+          </DialogTitle>
+
+          <DialogContent>
+            <DialogContentText>
+              {pendingDeletionName
+                ? `${pendingDeletionName} will be permanently removed, along with their project assignments. This can't be undone.`
+                : "This employee will be permanently removed. This can't be undone."}
+            </DialogContentText>
+          </DialogContent>
+
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              type="button"
+              disabled={isDeletingPendingEmployee}
+              onClick={handleCancelDelete}
+              sx={{ borderRadius: 2 }}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="button"
+              color="error"
+              variant="contained"
+              disableElevation
+              disabled={isDeletingPendingEmployee}
+              startIcon={
+                isDeletingPendingEmployee ? (
+                  <CircularProgress
+                    size={18}
+                    color="inherit"
+                  />
+                ) : (
+                  <DeleteIcon />
+                )
+              }
+              onClick={() =>
+                void handleConfirmDelete()
+              }
+              sx={{ borderRadius: 2 }}
+            >
+              {isDeletingPendingEmployee
+                ? "Deleting..."
+                : "Delete"}
+            </Button>
+          </DialogActions>
+          </Dialog>
+        <CreateEmployeeModal
+              open={createModalOpen}
+              departments={departments}
+              projects={projects}
+              onClose={() =>
+                setCreateModalOpen(false)
+              }
+              onCreated={handleEmployeeCreated}
+            />
+
+            <EditEmployeeModal
+              open={editModalOpen}
+              employee={selectedEmployee}
+              departments={departments}
+              projects={projects}
+              onClose={handleEditClose}
+              onUpdated={handleEmployeeUpdated}
+            />
+
+        <Snackbar
+          open={Boolean(successMessage)}
+          autoHideDuration={4000}
+          onClose={() => setSuccessMessage("")}
+          anchorOrigin={{
+            vertical: "bottom",
+            horizontal: "right",
+          }}
+        >
+          <Alert
+            severity="success"
+            variant="filled"
+            onClose={() => setSuccessMessage("")}
+            sx={{ borderRadius: 2 }}
+          >
+            {successMessage}
+          </Alert>
+        </Snackbar>
+      </Container>
     </Box>
   );
 }

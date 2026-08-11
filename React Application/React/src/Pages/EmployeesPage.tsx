@@ -4,16 +4,14 @@ import {
   useMemo,
   useState,
   type MouseEvent,
-  type ReactNode,
 } from "react";
 
 import AddIcon from "@mui/icons-material/Add";
-import ApartmentIcon from "@mui/icons-material/Apartment";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import GroupsIcon from "@mui/icons-material/Groups";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
 import {
@@ -35,15 +33,14 @@ import {
   Menu,
   MenuItem,
   Paper,
-  Skeleton,
   Snackbar,
   Stack,
   Tooltip,
   Typography,
-  alpha,
 } from "@mui/material";
 
 import { CreateEmployeeModal } from "../Components/CreateEmployeeModal";
+import { CreateUserModal } from "../Components/CreateUserModal";
 import { EditEmployeeModal } from "../Components/EditEmployeeModal";
 import { EmployeeTable } from "../Components/EmployeeTable";
 
@@ -60,6 +57,8 @@ import { getProjects } from "../services/projectService";
 
 import type { Department } from "../Types/department";
 
+import type { StoredUser } from "../Types/auth";
+
 import type {
   Employee,
   EmployeeDetail,
@@ -70,116 +69,12 @@ import type {
   Project,
 } from "../Types/project";
 
-import type {
-  StoredUser,
-} from "../Types/auth";
-
-// Each stat gets its own accent so the row scans as three distinct
-// signals rather than three repeats of the theme's primary color.
-type StatAccent = "indigo" | "violet" | "teal";
-
-const STAT_ACCENTS: Record<
-  StatAccent,
-  { main: string; soft: string }
-> = {
-  indigo: { main: "#4F46E5", soft: "#EEF0FD" },
-  violet: { main: "#7C3AED", soft: "#F3EDFD" },
-  teal: { main: "#0D9488", soft: "#E6F5F3" },
-};
-
-interface SummaryStatProps {
-  icon: ReactNode;
-  label: string;
-  value: number;
-  loading: boolean;
-  accent: StatAccent;
-}
-
-function SummaryStat({
-  icon,
-  label,
-  value,
-  loading,
-  accent,
-}: SummaryStatProps) {
-  const { main, soft } = STAT_ACCENTS[accent];
-
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        px: 2.75,
-        py: 2.25,
-        display: "flex",
-        alignItems: "center",
-        gap: 2,
-        borderRadius: 2.5,
-        flex: 1,
-        minWidth: 200,
-        border: "1px solid",
-        borderColor: "divider",
-        transition:
-          "border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease",
-        "&:hover": {
-          borderColor: alpha(main, 0.35),
-          boxShadow: `0 4px 16px ${alpha(main, 0.12)}`,
-          transform: "translateY(-1px)",
-        },
-      }}
-    >
-      <Box
-        sx={{
-          width: 46,
-          height: 46,
-          borderRadius: "14px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          bgcolor: soft,
-          color: main,
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </Box>
-
-      <Box sx={{ minWidth: 0 }}>
-        {loading ? (
-          <Skeleton width={40} height={32} />
-        ) : (
-          <Typography
-            variant="h5"
-            sx={{
-              fontWeight: 700,
-              lineHeight: 1.2,
-              letterSpacing: -0.5,
-            }}
-          >
-            {value}
-          </Typography>
-        )}
-
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          noWrap
-        >
-          {label}
-        </Typography>
-      </Box>
-    </Paper>
-  );
-}
 
 export function EmployeesPage() {
-  const currentUser =
+  const currentUser: StoredUser | null =
     getStoredUser();
 
-  const canManageEmployees: boolean =
-    currentUser?.role === "SuperAdmin" ||
-    currentUser?.role === "TeamLead";
-
-  const canDeleteEmployees: boolean =
+  const isSuperAdmin: boolean =
     currentUser?.role === "SuperAdmin";
 
   const [employees, setEmployees] =
@@ -195,6 +90,9 @@ export function EmployeesPage() {
     useState<boolean>(true);
 
   const [createModalOpen, setCreateModalOpen] =
+    useState<boolean>(false);
+
+  const [createUserModalOpen, setCreateUserModalOpen] =
     useState<boolean>(false);
 
   const [editModalOpen, setEditModalOpen] =
@@ -350,8 +248,7 @@ export function EmployeesPage() {
   }
 
   function handleEditOpen(): void {
-    if (!canManageEmployees ||
-        !selectedEmployee) {
+    if (!selectedEmployee) {
       return;
     }
 
@@ -452,18 +349,31 @@ export function EmployeesPage() {
     );
 
   return (
-    <Box sx={{ bgcolor: "#FAFAFA", minHeight: "100%" }}>
-      <Container maxWidth="xl" sx={{ py: 5 }}>
+    <Box sx={{ bgcolor: "#F5F7FB", minHeight: "100%", py: { xs: 2, md: 3 } }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
         <Stack spacing={3}>
           <Paper
             elevation={0}
             sx={{
               p: { xs: 2.5, sm: 3.5 },
-              borderRadius: 3,
+              borderRadius: 4,
               border: "1px solid",
               borderColor: "divider",
               background:
-                "linear-gradient(135deg, #FFFFFF 0%, #F7F7FB 100%)",
+                "linear-gradient(135deg, #FFFFFF 0%, #F7F8FF 55%, #EEF2FF 100%)",
+              boxShadow: "0 10px 30px rgba(15, 23, 42, 0.06)",
+              overflow: "hidden",
+              position: "relative",
+              "&::after": {
+                content: '""',
+                position: "absolute",
+                width: 180,
+                height: 180,
+                borderRadius: "50%",
+                right: -70,
+                top: -90,
+                background: "rgba(79, 70, 229, 0.08)",
+              },
             }}
           >
             <Box
@@ -482,27 +392,28 @@ export function EmployeesPage() {
               }}
             >
               <Box>
+
                 <Typography
                   component="h1"
                   variant="h4"
                   sx={{
-                    fontWeight: 700,
-                    letterSpacing: -0.6,
+                    fontWeight: 800,
+                    letterSpacing: -0.8,
+                    color: "#0F172A",
                   }}
                 >
-                  Employee Management
+                  Employees
                 </Typography>
 
                 <Typography
                   color="text.secondary"
                   sx={{ mt: 0.5 }}
                 >
-                  Manage employees, departments and project
-                  assignments in one place.
+                  View, add, edit and manage employee information.
                 </Typography>
               </Box>
 
-              <Stack direction="row" spacing={1}>
+              <Stack direction="row" spacing={1} sx={{ position: "relative", zIndex: 1, flexWrap: "wrap" }}>
                 <Tooltip title="Refresh">
                   <span>
                     <IconButton
@@ -513,15 +424,37 @@ export function EmployeesPage() {
                         border: "1px solid",
                         borderColor: "divider",
                         bgcolor: "background.paper",
+                        borderRadius: 2,
+                        boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+                        "&:hover": {
+                          bgcolor: "#F8FAFC",
+                        },
                       }}
                     >
                       <RefreshIcon />
                     </IconButton>
                   </span>
                 </Tooltip>
-
-                {canManageEmployees && (
+                {isSuperAdmin && (
                   <Button
+                    type="button"
+                    variant="outlined"
+                    startIcon={<ManageAccountsIcon />}
+                    onClick={() => setCreateUserModalOpen(true)}
+                    sx={{
+                      borderRadius: 2.5,
+                      px: 2.5,
+                      py: 1.05,
+                      fontWeight: 700,
+                      textTransform: "none",
+                      bgcolor: "background.paper",
+                    }}
+                  >
+                    Create User
+                  </Button>
+                )}
+
+                <Button
                     type="button"
                     variant="contained"
                     disableElevation
@@ -529,43 +462,20 @@ export function EmployeesPage() {
                     onClick={() =>
                       setCreateModalOpen(true)
                     }
-                    sx={{ borderRadius: 2, px: 2.5 }}
+                    sx={{
+                      borderRadius: 2.5,
+                      px: 2.75,
+                      py: 1.05,
+                      fontWeight: 700,
+                      textTransform: "none",
+                      boxShadow: "0 6px 16px rgba(79, 70, 229, 0.22)",
+                    }}
                   >
                     Add employee
                   </Button>
-                )}
               </Stack>
             </Box>
           </Paper>
-
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-          >
-            <SummaryStat
-              icon={<PeopleAltIcon />}
-              label="Employees"
-              value={employees.length}
-              loading={loading}
-              accent="indigo"
-            />
-
-            <SummaryStat
-              icon={<ApartmentIcon />}
-              label="Departments"
-              value={departments.length}
-              loading={loading}
-              accent="violet"
-            />
-
-            <SummaryStat
-              icon={<GroupsIcon />}
-              label="Active projects"
-              value={projects.length}
-              loading={loading}
-              accent="teal"
-            />
-          </Stack>
 
           {error && (
             <Alert
@@ -584,9 +494,11 @@ export function EmployeesPage() {
                 py: 8,
                 px: 3,
                 textAlign: "center",
-                borderRadius: 3,
+                borderRadius: 4,
                 borderStyle: "dashed",
+                borderColor: "#CBD5E1",
                 bgcolor: "background.paper",
+                boxShadow: "0 6px 20px rgba(15, 23, 42, 0.03)",
               }}
             >
               <Avatar
@@ -595,8 +507,8 @@ export function EmployeesPage() {
                   height: 64,
                   mx: "auto",
                   mb: 2,
-                  bgcolor: STAT_ACCENTS.indigo.soft,
-                  color: STAT_ACCENTS.indigo.main,
+                  bgcolor: "#EEF2FF",
+                  color: "#4F46E5",
                 }}
               >
                 <GroupsIcon sx={{ fontSize: 32 }} />
@@ -613,12 +525,10 @@ export function EmployeesPage() {
                 color="text.secondary"
                 sx={{ mb: 3, maxWidth: 420, mx: "auto" }}
               >
-                Add your first employee to start assigning
-                departments and projects.
+                Add your first employee to start managing
+                employee records.
               </Typography>
-
-              {canManageEmployees && (
-                <Button
+              <Button
                   type="button"
                   variant="contained"
                   disableElevation
@@ -630,24 +540,63 @@ export function EmployeesPage() {
                 >
                   Add employee
                 </Button>
-              )}
             </Paper>
           ) : (
             <Paper
               variant="outlined"
               sx={{
-                borderRadius: 3,
+                borderRadius: 4,
                 overflow: "hidden",
+                borderColor: "#E2E8F0",
+                bgcolor: "background.paper",
+                boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
               }}
             >
+              <Box
+                sx={{
+                  px: { xs: 2, sm: 3 },
+                  py: 2.25,
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  display: "flex",
+                  alignItems: { xs: "flex-start", sm: "center" },
+                  justifyContent: "space-between",
+                  flexDirection: { xs: "column", sm: "row" },
+                  gap: 1,
+                }}
+              >
+                <Box>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 800, color: "#0F172A" }}
+                  >
+                    All Employees
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Employee information currently available in the system.
+                  </Typography>
+                </Box>
+
+                <Typography
+                  variant="body2"
+                  sx={{
+                    px: 1.5,
+                    py: 0.65,
+                    borderRadius: 999,
+                    bgcolor: "#EEF2FF",
+                    color: "#4F46E5",
+                    fontWeight: 700,
+                  }}
+                >
+                  {employees.length} {employees.length === 1 ? "employee" : "employees"}
+                </Typography>
+              </Box>
+
               <EmployeeTable
                 employees={employees}
                 loading={loading}
                 deletingEmployeeId={deletingEmployeeId}
-                renderActions={
-                  canManageEmployees ||
-                  canDeleteEmployees
-                    ? (employee: Employee) => (
+                renderActions={(employee: Employee) => (
                         <Tooltip title="Employee actions">
                           <span>
                             <IconButton
@@ -672,9 +621,7 @@ export function EmployeesPage() {
                             </IconButton>
                           </span>
                         </Tooltip>
-                      )
-                    : undefined
-                }
+                      )}
               />
             </Paper>
           )}
@@ -695,14 +642,13 @@ export function EmployeesPage() {
           slotProps={{
             paper: {
               sx: {
-                borderRadius: 2,
+                borderRadius: 2.5,
                 minWidth: 180,
               },
             },
           }}
         >
-          {canManageEmployees && (
-            <MenuItem onClick={handleEditOpen}>
+          <MenuItem onClick={handleEditOpen}>
               <ListItemIcon>
                 <EditIcon fontSize="small" />
               </ListItemIcon>
@@ -711,11 +657,7 @@ export function EmployeesPage() {
                 Edit employee
               </ListItemText>
             </MenuItem>
-          )}
-
-          {canDeleteEmployees && (
-            <>
-              <Divider />
+          <Divider />
 
               <MenuItem
                 disabled={
@@ -736,12 +678,8 @@ export function EmployeesPage() {
                   Delete employee
                 </ListItemText>
               </MenuItem>
-            </>
-          )}
         </Menu>
-
-        {canDeleteEmployees && (
-          <Dialog
+        <Dialog
             open={Boolean(pendingDeletion)}
             onClose={handleCancelDelete}
             maxWidth="xs"
@@ -749,7 +687,7 @@ export function EmployeesPage() {
             slotProps={{
               paper: {
                 sx: {
-                  borderRadius: 3,
+                  borderRadius: 3.5,
                 },
               },
             }}
@@ -803,11 +741,14 @@ export function EmployeesPage() {
             </Button>
           </DialogActions>
           </Dialog>
+        {isSuperAdmin && (
+          <CreateUserModal
+            open={createUserModalOpen}
+            onClose={() => setCreateUserModalOpen(false)}
+          />
         )}
 
-        {canManageEmployees && (
-          <>
-            <CreateEmployeeModal
+        <CreateEmployeeModal
               open={createModalOpen}
               departments={departments}
               projects={projects}
@@ -825,8 +766,6 @@ export function EmployeesPage() {
               onClose={handleEditClose}
               onUpdated={handleEmployeeUpdated}
             />
-          </>
-        )}
 
         <Snackbar
           open={Boolean(successMessage)}
@@ -851,8 +790,9 @@ export function EmployeesPage() {
   );
 }
 
-function getStoredUser(): StoredUser | null {
-  const storedUserJson =
+function getStoredUser():
+  StoredUser | null {
+  const storedUserJson: string | null =
     localStorage.getItem("authUser");
 
   if (!storedUserJson) {

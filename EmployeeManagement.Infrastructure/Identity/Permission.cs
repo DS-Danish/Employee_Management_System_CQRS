@@ -10,7 +10,6 @@ public sealed class Permission
     public string Code { get; set; } =
         string.Empty;
 
-    public ICollection<UserPermission>
-        UserPermissions { get; set; } =
-        new List<UserPermission>();
+    public ICollection<RolePermission> RolePermissions { get; set; } =
+        new List<RolePermission>();
 }

@@ -4,69 +4,141 @@ import {
   Button,
   Card,
   CardContent,
-  Checkbox,
+  Chip,
   CircularProgress,
   Container,
   FormControl,
-  FormControlLabel,
   InputLabel,
   MenuItem,
+  Paper,
   Select,
   Stack,
+  Switch,
   Typography,
+  alpha,
 } from "@mui/material";
+
+import ApartmentIcon from "@mui/icons-material/Apartment";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import GroupsIcon from "@mui/icons-material/Groups";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import SecurityIcon from "@mui/icons-material/Security";
+import WorkIcon from "@mui/icons-material/Work";
 
 import {
   useEffect,
   useMemo,
   useState,
+  type ReactNode,
 } from "react";
 
-import {
-  ApiError,
-} from "../services/apiClient";
+import { ApiError } from "../services/apiClient";
 
 import {
-  getPermissionUsers,
+  getPermissionRoles,
   getPermissions,
-  getUserPermissions,
-  updateUserPermissions,
+  getRolePermissions,
+  updateRolePermissions,
 } from "../services/permissionService";
 
-import type {
-  StoredUser,
-} from "../Types/auth";
+import type { StoredUser } from "../Types/auth";
 
 import type {
   Permission,
-  PermissionUser,
+  PermissionRole,
 } from "../Types/permission";
 
-const EMPLOYEE_RESTRICTED_PERMISSION_CODES: ReadonlySet<string> =
-  new Set<string>([
-    "employees.manage",
-    "employees.delete",
-  ]);
+const ACCENT = "#4F46E5";
+
+const EMPLOYEE_RESTRICTED_PERMISSION_CODES:
+  ReadonlySet<string> =
+    new Set<string>([
+      "employees.manage",
+      "employees.delete",
+    ]);
+
+const PERMISSION_CATEGORY_STYLES:
+  Record<
+    string,
+    {
+      color: string;
+      icon: ReactNode;
+    }
+  > = {
+    employees: {
+      color: "#4F46E5",
+      icon: <GroupsIcon fontSize="small" />,
+    },
+
+    departments: {
+      color: "#0D9488",
+      icon: <ApartmentIcon fontSize="small" />,
+    },
+
+    projects: {
+      color: "#7C3AED",
+      icon: <WorkIcon fontSize="small" />,
+    },
+
+    leaves: {
+      color: "#D97706",
+      icon: <EventAvailableIcon fontSize="small" />,
+    },
+
+    leave: {
+      color: "#D97706",
+      icon: <EventAvailableIcon fontSize="small" />,
+    },
+
+    users: {
+      color: "#2563EB",
+      icon: <ManageAccountsIcon fontSize="small" />,
+    },
+
+    permissions: {
+      color: "#DC2626",
+      icon: <SecurityIcon fontSize="small" />,
+    },
+  };
+
+const DEFAULT_CATEGORY_STYLE: {
+  color: string;
+  icon: ReactNode;
+} = {
+  color: "#64748B",
+  icon: <SecurityIcon fontSize="small" />,
+};
+
+function getPermissionCategoryStyle(
+  code: string,
+): {
+  color: string;
+  icon: ReactNode;
+} {
+  const prefix: string =
+    code
+      .split(".")[0]
+      ?.toLowerCase() ?? "";
+
+  return (
+    PERMISSION_CATEGORY_STYLES[prefix] ??
+    DEFAULT_CATEGORY_STYLE
+  );
+}
 
 export default function PermissionManagementPage():
   React.ReactElement {
   const currentUser: StoredUser | null =
     getStoredUser();
 
-  const [
-    users,
-    setUsers,
-  ] = useState<PermissionUser[]>([]);
+  const [roles, setRoles] =
+    useState<PermissionRole[]>([]);
 
-  const [
-    permissions,
-    setPermissions,
-  ] = useState<Permission[]>([]);
+  const [permissions, setPermissions] =
+    useState<Permission[]>([]);
 
-  const [
-    selectedUserId,
-    setSelectedUserId,
-  ] = useState<string>("");
+  const [selectedRole, setSelectedRole] =
+    useState<string>("");
 
   const [
     selectedPermissionIds,
@@ -78,20 +150,16 @@ export default function PermissionManagementPage():
     setOriginalPermissionIds,
   ] = useState<number[]>([]);
 
-  const [
-    loading,
-    setLoading,
-  ] = useState<boolean>(true);
+  const [loading, setLoading] =
+    useState<boolean>(true);
 
   const [
-    loadingUserPermissions,
-    setLoadingUserPermissions,
+    loadingRolePermissions,
+    setLoadingRolePermissions,
   ] = useState<boolean>(false);
 
-  const [
-    saving,
-    setSaving,
-  ] = useState<boolean>(false);
+  const [saving, setSaving] =
+    useState<boolean>(false);
 
   const [
     errorMessage,
@@ -104,76 +172,47 @@ export default function PermissionManagementPage():
   ] = useState<string>("");
 
   const isSuperAdmin: boolean =
-    currentUser?.role ===
-    "SuperAdmin";
+    currentUser?.role === "SuperAdmin";
 
   const isTeamLead: boolean =
-    currentUser?.role ===
-    "TeamLead";
+    currentUser?.role === "TeamLead";
+
+  const selectedRoleDetails:
+    PermissionRole | undefined =
+      useMemo(
+        () =>
+          roles.find(
+            (
+              role: PermissionRole,
+            ): boolean =>
+              role.name === selectedRole,
+          ),
+        [roles, selectedRole],
+      );
 
   /*
-   * Backend is authoritative, but we also
-   * remove the logged-in account from the
-   * frontend list.
+   * Employee role must never receive
+   * employee management/delete permissions.
    */
-  const manageableUsers:
-    PermissionUser[] =
-    useMemo(
-      () =>
-        users.filter(
-          (
-            user:
-              PermissionUser,
-          ) =>
-            user.id !==
-            currentUser?.userId,
-        ),
-      [
-        users,
-        currentUser?.userId,
-      ],
-    );
-
-  const selectedUser: PermissionUser | undefined =
-    useMemo(
-      () =>
-        manageableUsers.find(
-          (
-            user: PermissionUser,
-          ): boolean =>
-            user.id === selectedUserId,
-        ),
-      [
-        manageableUsers,
-        selectedUserId,
-      ],
-    );
-
-  const assignablePermissions: Permission[] =
-    useMemo(
-      () => {
-        if (!selectedUser) {
+  const assignablePermissions:
+    Permission[] =
+      useMemo(() => {
+        if (!selectedRole) {
           return [];
         }
 
-        if (selectedUser.role === "Employee") {
+        if (selectedRole === "Employee") {
           return permissions.filter(
             (
               permission: Permission,
             ): boolean =>
-              !EMPLOYEE_RESTRICTED_PERMISSION_CODES.has(
-                permission.code,
-              ),
+              !EMPLOYEE_RESTRICTED_PERMISSION_CODES
+                .has(permission.code),
           );
         }
 
         return permissions;
-      },
-      [
-        permissions,
-        selectedUser,
-      ],
-    );
+      }, [permissions, selectedRole]);
 
   useEffect(() => {
     async function loadData():
@@ -183,25 +222,18 @@ export default function PermissionManagementPage():
         setErrorMessage("");
 
         const [
-          usersResult,
+          rolesResult,
           permissionsResult,
         ] = await Promise.all([
-          getPermissionUsers(),
+          getPermissionRoles(),
           getPermissions(),
         ]);
 
-        setUsers(
-          usersResult,
-        );
-
-        setPermissions(
-          permissionsResult,
-        );
+        setRoles(rolesResult);
+        setPermissions(permissionsResult);
       } catch (error: unknown) {
         setErrorMessage(
-          getErrorMessage(
-            error,
-          ),
+          getErrorMessage(error),
         );
       } finally {
         setLoading(false);
@@ -211,81 +243,46 @@ export default function PermissionManagementPage():
     void loadData();
   }, []);
 
-  async function handleUserChange(
-    userId: string,
+  async function handleRoleChange(
+    roleName: string,
   ): Promise<void> {
-    setSelectedUserId(
-      userId,
-    );
+    setSelectedRole(roleName);
 
-    setSelectedPermissionIds(
-      [],
-    );
-
-    setOriginalPermissionIds(
-      [],
-    );
+    setSelectedPermissionIds([]);
+    setOriginalPermissionIds([]);
 
     setSuccessMessage("");
     setErrorMessage("");
 
-    if (!userId) {
-      return;
-    }
-
-    /*
-     * Additional frontend protection.
-     * Backend must also enforce this.
-     */
-    if (
-      userId ===
-      currentUser?.userId
-    ) {
-      setSelectedUserId("");
-
-      setErrorMessage(
-        "You cannot manage your own permissions.",
-      );
-
+    if (!roleName) {
       return;
     }
 
     try {
-      setLoadingUserPermissions(
-        true,
-      );
+      setLoadingRolePermissions(true);
 
-      const userPermissions =
-        await getUserPermissions(
-          userId,
-        );
-
-      const selectedPermissionUser:
-        PermissionUser | undefined =
-        manageableUsers.find(
-          (
-            user: PermissionUser,
-          ): boolean =>
-            user.id === userId,
-        );
+      const rolePermissions:
+        Permission[] =
+          await getRolePermissions(
+            roleName,
+          );
 
       const permissionIds: number[] =
-        userPermissions
+        rolePermissions
           .filter(
             (
               permission: Permission,
             ): boolean => {
               if (
-                selectedPermissionUser?.role !==
-                "Employee"
+                roleName !== "Employee"
               ) {
                 return true;
               }
 
-              return !EMPLOYEE_RESTRICTED_PERMISSION_CODES
-                .has(
-                  permission.code,
-                );
+              return (
+                !EMPLOYEE_RESTRICTED_PERMISSION_CODES
+                  .has(permission.code)
+              );
             },
           )
           .map(
@@ -304,18 +301,14 @@ export default function PermissionManagementPage():
       );
     } catch (error: unknown) {
       setErrorMessage(
-        getErrorMessage(
-          error,
-        ),
+        getErrorMessage(error),
       );
     } finally {
-      setLoadingUserPermissions(
-        false,
-      );
+      setLoadingRolePermissions(false);
     }
   }
 
-  function handlePermissionChange(
+  function handlePermissionToggle(
     permissionId: number,
     checked: boolean,
   ): void {
@@ -323,13 +316,12 @@ export default function PermissionManagementPage():
       (
         currentPermissionIds:
           number[],
-      ) => {
+      ): number[] => {
         if (checked) {
           if (
-            currentPermissionIds
-              .includes(
-                permissionId,
-              )
+            currentPermissionIds.includes(
+              permissionId,
+            )
           ) {
             return currentPermissionIds;
           }
@@ -340,23 +332,22 @@ export default function PermissionManagementPage():
           ];
         }
 
-        return currentPermissionIds
-          .filter(
-            (
-              currentPermissionId:
-                number,
-            ) =>
-              currentPermissionId !==
-              permissionId,
-          );
+        return currentPermissionIds.filter(
+          (
+            currentPermissionId:
+              number,
+          ): boolean =>
+            currentPermissionId !==
+            permissionId,
+        );
       },
     );
   }
 
-  const hasPermissionChanges: boolean =
-    useMemo(
-      () => {
-        if (!selectedUserId) {
+  const hasPermissionChanges:
+    boolean =
+      useMemo(() => {
+        if (!selectedRole) {
           return false;
         }
 
@@ -375,32 +366,27 @@ export default function PermissionManagementPage():
               permissionId,
             ),
         );
-      },
-      [
-        selectedUserId,
+      }, [
+        selectedRole,
         selectedPermissionIds,
         originalPermissionIds,
-      ],
-    );
+      ]);
+
+  function handleDiscardChanges():
+    void {
+    setSelectedPermissionIds([
+      ...originalPermissionIds,
+    ]);
+
+    setErrorMessage("");
+    setSuccessMessage("");
+  }
 
   async function handleSave():
     Promise<void> {
-    if (!selectedUserId) {
+    if (!selectedRole) {
       setErrorMessage(
-        isTeamLead
-          ? "Select an employee."
-          : "Select an employee or team lead.",
-      );
-
-      return;
-    }
-
-    if (
-      selectedUserId ===
-      currentUser?.userId
-    ) {
-      setErrorMessage(
-        "You cannot modify your own permissions.",
+        "Select a role first.",
       );
 
       return;
@@ -417,72 +403,64 @@ export default function PermissionManagementPage():
 
       const assignablePermissionIds:
         Set<number> =
-        new Set<number>(
-          assignablePermissions.map(
-            (
-              permission: Permission,
-            ): number =>
-              permission.id,
-          ),
-        );
-
-      const permissionIdsToSave: number[] =
-        selectedPermissionIds.filter(
-          (
-            permissionId: number,
-          ): boolean =>
-            assignablePermissionIds.has(
-              permissionId,
+          new Set<number>(
+            assignablePermissions.map(
+              (
+                permission:
+                  Permission,
+              ): number =>
+                permission.id,
             ),
-        );
+          );
 
-      await updateUserPermissions(
-        selectedUserId,
+      const permissionIdsToSave:
+        number[] =
+          selectedPermissionIds.filter(
+            (
+              permissionId: number,
+            ): boolean =>
+              assignablePermissionIds
+                .has(permissionId),
+          );
+
+      await updateRolePermissions(
+        selectedRole,
         permissionIdsToSave,
       );
 
-      setOriginalPermissionIds(
-        [...permissionIdsToSave],
-      );
+      setOriginalPermissionIds([
+        ...permissionIdsToSave,
+      ]);
 
-      setSelectedPermissionIds(
-        [...permissionIdsToSave],
-      );
+      setSelectedPermissionIds([
+        ...permissionIdsToSave,
+      ]);
 
       setSuccessMessage(
-        "Permissions updated successfully.",
+        `${
+          selectedRoleDetails
+            ?.displayName ??
+          selectedRole
+        } permissions updated successfully.`,
       );
     } catch (error: unknown) {
       setErrorMessage(
-        getErrorMessage(
-          error,
-        ),
+        getErrorMessage(error),
       );
     } finally {
       setSaving(false);
     }
   }
 
-  /*
-   * Employee should never reach this page
-   * because App.tsx doesn't expose the route.
-   *
-   * Keep a defensive UI check as well.
-   */
-  if (
-    !isSuperAdmin &&
-    !isTeamLead
-  ) {
+  if (!isSuperAdmin && !isTeamLead) {
     return (
       <Container
         maxWidth="md"
-        sx={{
-          py: 5,
-        }}
+        sx={{ py: 5 }}
       >
         <Alert severity="error">
-          You do not have permission
-          to manage user permissions.
+          You do not have permission to
+          manage role permissions.
         </Alert>
       </Container>
     );
@@ -503,15 +481,10 @@ export default function PermissionManagementPage():
     );
   }
 
-  const targetLabel: string =
-    isTeamLead
-      ? "Employee"
-      : "Employee / Team Lead";
-
   return (
     <Box
       sx={{
-        bgcolor: "#F8FAFC",
+        bgcolor: "#F5F7FB",
         minHeight: "100%",
       }}
     >
@@ -525,27 +498,56 @@ export default function PermissionManagementPage():
         }}
       >
         <Stack spacing={3}>
-          <Box>
-            <Typography
-              variant="h4"
+          {/* HEADER */}
+          <Stack
+            direction="row"
+            spacing={1.75}
+            sx={{
+              alignItems: "center",
+            }}
+          >
+            <Box
               sx={{
-                fontWeight: 700,
+                width: 48,
+                height: 48,
+                borderRadius: "14px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: alpha(
+                  ACCENT,
+                  0.12,
+                ),
+                color: ACCENT,
+                flexShrink: 0,
               }}
             >
-              Permission Management
-            </Typography>
+              <SecurityIcon />
+            </Box>
 
-            <Typography
-              color="text.secondary"
-              sx={{
-                mt: 1,
-              }}
-            >
-              {isSuperAdmin
-                ? "Assign application permissions to employees and team leads."
-                : "Assign application permissions to employees."}
-            </Typography>
-          </Box>
+            <Box>
+              <Typography
+                component="h1"
+                variant="h4"
+                sx={{
+                  fontWeight: 800,
+                  letterSpacing: -0.5,
+                  color: "#0F172A",
+                }}
+              >
+                Permission Management
+              </Typography>
+
+              <Typography
+                color="text.secondary"
+                sx={{ mt: 0.5 }}
+              >
+                Manage application access
+                for employees and team
+                leads by role.
+              </Typography>
+            </Box>
+          </Stack>
 
           {errorMessage && (
             <Alert
@@ -553,6 +555,7 @@ export default function PermissionManagementPage():
               onClose={() =>
                 setErrorMessage("")
               }
+              sx={{ borderRadius: 2 }}
             >
               {errorMessage}
             </Alert>
@@ -564,6 +567,7 @@ export default function PermissionManagementPage():
               onClose={() =>
                 setSuccessMessage("")
               }
+              sx={{ borderRadius: 2 }}
             >
               {successMessage}
             </Alert>
@@ -586,96 +590,178 @@ export default function PermissionManagementPage():
               }}
             >
               <Stack spacing={4}>
-                <FormControl fullWidth>
-                  <InputLabel>
-                    {targetLabel}
-                  </InputLabel>
+                {/* ROLE SELECTION */}
+                <Box>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      mb: 0.5,
+                    }}
+                  >
+                    Select Role
+                  </Typography>
 
-                  <Select
-                    value={
-                      selectedUserId
-                    }
-                    label={
-                      targetLabel
-                    }
-                    onChange={
-                      event =>
-                        void handleUserChange(
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 2 }}
+                  >
+                    Permissions saved here
+                    apply to every user
+                    assigned to the selected
+                    role.
+                  </Typography>
+
+                  <FormControl
+                    fullWidth
+                    sx={{
+                      maxWidth: 520,
+                    }}
+                  >
+                    <InputLabel>
+                      Role
+                    </InputLabel>
+
+                    <Select
+                      value={selectedRole}
+                      label="Role"
+                      onChange={(
+                        event,
+                      ) =>
+                        void handleRoleChange(
                           String(
                             event.target
                               .value,
                           ),
                         )
-                    }
-                  >
-                    {manageableUsers.map(
-                      (
-                        user:
-                          PermissionUser,
-                      ) => (
-                        <MenuItem
-                          key={
-                            user.id
-                          }
-                          value={
-                            user.id
-                          }
-                        >
-                          {user.name}
-                          {" — "}
-                          {user.role}
-                        </MenuItem>
-                      ),
-                    )}
-                  </Select>
-                </FormControl>
+                      }
+                      sx={{
+                        borderRadius: 2,
+                      }}
+                    >
+                      {roles.map(
+                        (
+                          role:
+                            PermissionRole,
+                        ) => (
+                          <MenuItem
+                            key={
+                              role.name
+                            }
+                            value={
+                              role.name
+                            }
+                          >
+                            {
+                              role.displayName
+                            }
+                          </MenuItem>
+                        ),
+                      )}
+                    </Select>
+                  </FormControl>
+                </Box>
 
-                {manageableUsers.length === 0 && (
-                  <Alert severity="info">
-                    {isTeamLead
-                      ? "There are no employees available for permission management."
-                      : "There are no users available for permission management."}
+                {roles.length === 0 && (
+                  <Alert
+                    severity="info"
+                    sx={{
+                      borderRadius: 2,
+                    }}
+                  >
+                    There are no roles
+                    available for permission
+                    management.
                   </Alert>
                 )}
 
-                {selectedUserId && (
+                {selectedRole && (
                   <>
-                    <Box>
-                      <Typography
-                        variant="h6"
+                    <Box
+                      sx={{
+                        height: "1px",
+                        bgcolor: "divider",
+                      }}
+                    />
+
+                    <Stack
+                      direction="row"
+                      sx={{
+                        alignItems:
+                          "center",
+                        justifyContent:
+                          "space-between",
+                      }}
+                    >
+                      <Box>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 700,
+                            mb: 0.5,
+                          }}
+                        >
+                          Permissions for{" "}
+                          {selectedRoleDetails
+                            ?.displayName ??
+                            selectedRole}
+                        </Typography>
+
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                        >
+                          Enable the
+                          capabilities that
+                          every user in this
+                          role should have.
+                        </Typography>
+                      </Box>
+
+                      {!loadingRolePermissions &&
+                        assignablePermissions
+                          .length > 0 && (
+                          <Chip
+                            label={`${selectedPermissionIds.length} of ${assignablePermissions.length} enabled`}
+                            size="small"
+                            sx={{
+                              fontWeight: 600,
+                              bgcolor:
+                                alpha(
+                                  ACCENT,
+                                  0.1,
+                                ),
+                              color:
+                                ACCENT,
+                            }}
+                          />
+                        )}
+                    </Stack>
+
+                    {selectedRole ===
+                      "Employee" && (
+                      <Alert
+                        severity="info"
                         sx={{
-                          fontWeight: 700,
-                          mb: 0.5,
+                          borderRadius: 2,
                         }}
                       >
-                        Permissions
-                      </Typography>
-
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                      >
-                        Select only the
-                        capabilities this
-                        user should have.
-                      </Typography>
-                    </Box>
-
-                    {selectedUser?.role ===
-                      "Employee" && (
-                      <Alert severity="info">
-                        Employees may be granted view access,
-                        but employee edit and delete permissions
-                        are restricted to Team Leads and
-                        Super Admins.
+                        Employee edit and
+                        delete permissions
+                        are restricted and
+                        cannot be assigned
+                        to the Employee
+                        role.
                       </Alert>
                     )}
 
-                    {loadingUserPermissions ? (
+                    {loadingRolePermissions ? (
                       <Box
                         sx={{
-                          py: 4,
-                          display: "flex",
+                          py: 5,
+                          display:
+                            "flex",
                           justifyContent:
                             "center",
                         }}
@@ -685,83 +771,109 @@ export default function PermissionManagementPage():
                         />
                       </Box>
                     ) : (
-                      <Stack spacing={1}>
-                        {assignablePermissions.map(
-                          (
-                            permission:
-                              Permission,
-                          ) => (
-                            <FormControlLabel
-                              key={
-                                permission.id
-                              }
-                              control={
-                                <Checkbox
-                                  checked={
-                                    selectedPermissionIds
-                                      .includes(
-                                        permission.id,
-                                      )
-                                  }
-                                  onChange={
-                                    event =>
-                                      handlePermissionChange(
-                                        permission.id,
-                                        event.target
-                                          .checked,
-                                      )
-                                  }
-                                />
-                              }
-                              label={
-                                <Box>
-                                  <Typography
-                                    variant="body1"
-                                    sx={{
-                                      fontWeight:
-                                        500,
-                                    }}
-                                  >
-                                    {
-                                      permission.name
-                                    }
-                                  </Typography>
-
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                  >
-                                    {
-                                      permission.code
-                                    }
-                                  </Typography>
-                                </Box>
-                              }
-                            />
-                          ),
-                        )}
+                      <Stack
+                        spacing={1.25}
+                      >
+                        {assignablePermissions
+                          .map(
+                            (
+                              permission:
+                                Permission,
+                            ) => (
+                              <PermissionRow
+                                key={
+                                  permission.id
+                                }
+                                permission={
+                                  permission
+                                }
+                                checked={selectedPermissionIds.includes(
+                                  permission.id,
+                                )}
+                                onToggle={(
+                                  checked:
+                                    boolean,
+                                ) =>
+                                  handlePermissionToggle(
+                                    permission.id,
+                                    checked,
+                                  )
+                                }
+                              />
+                            ),
+                          )}
                       </Stack>
                     )}
 
-                    <Button
-                      variant="contained"
-                      disabled={
-                        saving ||
-                        loadingUserPermissions ||
-                        !hasPermissionChanges
-                      }
-                      onClick={() =>
-                        void handleSave()
-                      }
+                    {!loadingRolePermissions &&
+                      assignablePermissions
+                        .length === 0 && (
+                        <Alert
+                          severity="info"
+                          sx={{
+                            borderRadius: 2,
+                          }}
+                        >
+                          No permissions
+                          are available for
+                          this role.
+                        </Alert>
+                      )}
+
+                    <Stack
+                      direction="row"
+                      spacing={1.5}
                       sx={{
-                        alignSelf:
-                          "flex-start",
+                        alignItems:
+                          "center",
+                        pt: 1,
                       }}
                     >
-                      {saving
-                        ? "Saving..."
-                        : "Save Permissions"}
-                    </Button>
+                      <Button
+                        type="button"
+                        variant="contained"
+                        disableElevation
+                        disabled={
+                          saving ||
+                          loadingRolePermissions ||
+                          !hasPermissionChanges
+                        }
+                        onClick={() =>
+                          void handleSave()
+                        }
+                        sx={{
+                          borderRadius: 2,
+                          px: 3,
+                          fontWeight: 700,
+                          textTransform:
+                            "none",
+                        }}
+                      >
+                        {saving
+                          ? "Saving..."
+                          : "Save Permissions"}
+                      </Button>
+
+                      {hasPermissionChanges &&
+                        !saving && (
+                          <Button
+                            type="button"
+                            variant="text"
+                            onClick={
+                              handleDiscardChanges
+                            }
+                            sx={{
+                              borderRadius: 2,
+                              color:
+                                "text.secondary",
+                              textTransform:
+                                "none",
+                            }}
+                          >
+                            Discard changes
+                          </Button>
+                        )}
+                    </Stack>
                   </>
                 )}
               </Stack>
@@ -773,14 +885,140 @@ export default function PermissionManagementPage():
   );
 }
 
+interface PermissionRowProps {
+  permission: Permission;
+  checked: boolean;
+  onToggle: (
+    checked: boolean,
+  ) => void;
+}
+
+function PermissionRow({
+  permission,
+  checked,
+  onToggle,
+}: PermissionRowProps):
+  React.ReactElement {
+  const {
+    color,
+    icon,
+  } = getPermissionCategoryStyle(
+    permission.code,
+  );
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        px: 2,
+        py: 1.5,
+        borderRadius: 2,
+        display: "flex",
+        alignItems: "center",
+        justifyContent:
+          "space-between",
+        gap: 2,
+
+        borderColor: checked
+          ? alpha(color, 0.35)
+          : "divider",
+
+        bgcolor: checked
+          ? alpha(color, 0.04)
+          : "background.paper",
+
+        transition:
+          "border-color 150ms ease, background-color 150ms ease",
+      }}
+    >
+      <Stack
+        direction="row"
+        spacing={1.5}
+        sx={{
+          alignItems: "center",
+          minWidth: 0,
+        }}
+      >
+        <Box
+          sx={{
+            width: 36,
+            height: 36,
+            borderRadius: "10px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent:
+              "center",
+            bgcolor: alpha(
+              color,
+              0.12,
+            ),
+            color,
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </Box>
+
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 600,
+            }}
+            noWrap
+          >
+            {permission.name}
+          </Typography>
+
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            noWrap
+          >
+            {permission.code}
+          </Typography>
+        </Box>
+      </Stack>
+
+      <Switch
+        checked={checked}
+        onChange={(event) =>
+          onToggle(
+            event.target.checked,
+          )
+        }
+        sx={{
+          "& .MuiSwitch-switchBase.Mui-checked":
+            {
+              color,
+            },
+
+          "& .MuiSwitch-switchBase.Mui-checked:hover":
+            {
+              bgcolor: alpha(
+                color,
+                0.08,
+              ),
+            },
+
+          "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
+            {
+              bgcolor: color,
+              opacity: 1,
+            },
+        }}
+      />
+    </Paper>
+  );
+}
+
 function getStoredUser():
   StoredUser | null {
   const storedUserJson:
-    | string
-    | null =
-    localStorage.getItem(
-      "authUser",
-    );
+    string | null =
+      localStorage.getItem(
+        "authUser",
+      );
 
   if (!storedUserJson) {
     return null;
@@ -803,15 +1041,11 @@ function getErrorMessage(
     error,
   );
 
-  if (
-    error instanceof ApiError
-  ) {
+  if (error instanceof ApiError) {
     return `${error.status}: ${error.message}`;
   }
 
-  if (
-    error instanceof Error
-  ) {
+  if (error instanceof Error) {
     return error.message;
   }
 

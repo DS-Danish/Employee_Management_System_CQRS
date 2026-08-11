@@ -1,46 +1,36 @@
-using System.Security.Claims;
 using EmployeeManagement.Application.Common.Constants;
 using EmployeeManagement.Infrastructure.Identity;
 using EmployeeManagement.Infrastructure.Persistence;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using EmployeeManagement.API.Contracts;
 
 namespace EmployeeManagement.API.Controllers;
 
 [ApiController]
 [Route("api/permissions")]
 [Authorize]
-public sealed class PermissionsController
-    : ControllerBase
+public sealed class PermissionsController : ControllerBase
 {
-    private readonly ApplicationDbContext
-        _dbContext;
-
-    private readonly UserManager<ApplicationUser>
-        _userManager;
+    private readonly ApplicationDbContext _dbContext;
+    private readonly RoleManager<IdentityRole> _roleManager;
 
     public PermissionsController(
         ApplicationDbContext dbContext,
-        UserManager<ApplicationUser> userManager)
+        RoleManager<IdentityRole> roleManager)
     {
         _dbContext = dbContext;
-        _userManager = userManager;
+        _roleManager = roleManager;
     }
 
-    /*
-     * SuperAdmin and TeamLead/Admin can view
-     * the list of available permissions.
-     *
-     * Employee/User cannot access permission
-     * management at all.
-     */
+    // GET: api/permissions
     [HttpGet]
     public async Task<ActionResult<
-        IReadOnlyList<PermissionResponse>>>
-        GetPermissions(
-            CancellationToken cancellationToken)
+        IReadOnlyList<PermissionResponse>>> GetPermissions(
+        CancellationToken cancellationToken)
     {
         if (!CanManagePermissions())
         {
@@ -51,317 +41,168 @@ public sealed class PermissionsController
             await _dbContext
                 .Permissions
                 .AsNoTracking()
-                .OrderBy(
-                    permission =>
-                        permission.Name)
+                .OrderBy(permission => permission.Name)
                 .Select(
                     permission =>
                         new PermissionResponse(
                             permission.Id,
                             permission.Name,
                             permission.Code))
-                .ToListAsync(
-                    cancellationToken);
+                .ToListAsync(cancellationToken);
 
         return Ok(permissions);
     }
 
-    /*
-     * SuperAdmin:
-     *      sees TeamLead/Admin + Employee/User.
-     *
-     * TeamLead/Admin:
-     *      sees Employee/User only.
-     *
-     * Nobody sees themselves.
-     */
-    [HttpGet("users")]
-    public async Task<ActionResult<
-        IReadOnlyList<PermissionUserResponse>>>
-        GetUsers(
-            CancellationToken cancellationToken)
+    // GET: api/permissions/roles
+    [HttpGet("roles")]
+    public ActionResult<IReadOnlyList<RoleResponse>>
+        GetManageableRoles()
     {
         if (!CanManagePermissions())
         {
             return Forbid();
         }
 
-        string? currentUserId =
-            GetCurrentUserId();
+        List<RoleResponse> roles = [];
 
-        if (string.IsNullOrWhiteSpace(
-                currentUserId))
+        if (User.IsInRole(AppRoles.SuperAdmin))
         {
-            return Unauthorized();
+            roles.Add(
+                new RoleResponse(
+                    AppRoles.TeamLead,
+                    "Team Lead"));
+
+            roles.Add(
+                new RoleResponse(
+                    AppRoles.Employee,
+                    "Employee"));
+
+            return Ok(roles);
         }
 
-        List<ApplicationUser> users =
-            await _userManager
-                .Users
-                .AsNoTracking()
-                .Where(
-                    user =>
-                        user.Id !=
-                        currentUserId)
-                .OrderBy(
-                    user =>
-                        user.FullName)
-                .ToListAsync(
-                    cancellationToken);
-
-        var result =
-            new List<PermissionUserResponse>();
-
-        foreach (
-            ApplicationUser user
-            in users)
+        if (User.IsInRole(AppRoles.TeamLead))
         {
-            IList<string> roles =
-                await _userManager
-                    .GetRolesAsync(
-                        user);
+            roles.Add(
+                new RoleResponse(
+                    AppRoles.Employee,
+                    "Employee"));
 
-            string? targetRole =
-                GetPrimaryRole(
-                    roles);
-
-            if (targetRole is null)
-            {
-                continue;
-            }
-
-            if (!CanManageRole(
-                    targetRole))
-            {
-                continue;
-            }
-
-            result.Add(
-                new PermissionUserResponse(
-                    user.Id,
-                    user.FullName,
-                    user.Email ??
-                        string.Empty,
-                    targetRole));
+            return Ok(roles);
         }
 
-        return Ok(result);
+        return Forbid();
     }
 
-    /*
-     * Returns permissions for one target user.
-     *
-     * Access restrictions are evaluated before
-     * any permission information is returned.
-     */
-    [HttpGet("users/{userId}")]
+    // GET: api/permissions/roles/Employee
+    // GET: api/permissions/roles/TeamLead
+    [HttpGet("roles/{roleName}")]
     public async Task<ActionResult<
-        IReadOnlyList<PermissionResponse>>>
-        GetUserPermissions(
-            string userId,
-            CancellationToken cancellationToken)
+        IReadOnlyList<PermissionResponse>>> GetRolePermissions(
+        string roleName,
+        CancellationToken cancellationToken)
     {
         if (!CanManagePermissions())
         {
             return Forbid();
         }
 
-        string? currentUserId =
-            GetCurrentUserId();
+        string? normalizedRole =
+            NormalizeRole(roleName);
 
-        if (string.IsNullOrWhiteSpace(
-                currentUserId))
-        {
-            return Unauthorized();
-        }
-
-        /*
-         * Nobody can inspect/manage their own
-         * permissions through this management API.
-         */
-        if (string.Equals(
-                currentUserId,
-                userId,
-                StringComparison.Ordinal))
+        if (normalizedRole is null)
         {
             return BadRequest(
                 new
                 {
-                    message =
-                        "You cannot manage your own permissions."
+                    message = "The selected role is invalid."
                 });
         }
 
-        ApplicationUser? targetUser =
-            await _userManager
-                .FindByIdAsync(
-                    userId);
+        if (!CanManageRole(normalizedRole))
+        {
+            return Forbid();
+        }
 
-        if (targetUser is null)
+        IdentityRole? role =
+            await _roleManager.FindByNameAsync(
+                normalizedRole);
+
+        if (role is null)
         {
             return NotFound(
                 new
                 {
-                    message =
-                        "User was not found."
+                    message = "The selected role was not found."
                 });
-        }
-
-        IList<string> targetRoles =
-            await _userManager
-                .GetRolesAsync(
-                    targetUser);
-
-        string? targetRole =
-            GetPrimaryRole(
-                targetRoles);
-
-        if (targetRole is null)
-        {
-            return BadRequest(
-                new
-                {
-                    message =
-                        "The selected account does not have a supported role."
-                });
-        }
-
-        if (!CanManageRole(
-                targetRole))
-        {
-            return Forbid();
         }
 
         List<PermissionResponse> permissions =
             await _dbContext
-                .UserPermissions
+                .RolePermissions
                 .AsNoTracking()
                 .Where(
-                    userPermission =>
-                        userPermission.UserId ==
-                        userId)
+                    rolePermission =>
+                        rolePermission.RoleId == role.Id)
                 .OrderBy(
-                    userPermission =>
-                        userPermission
-                            .Permission
-                            .Name)
+                    rolePermission =>
+                        rolePermission.Permission.Name)
                 .Select(
-                    userPermission =>
+                    rolePermission =>
                         new PermissionResponse(
-                            userPermission
-                                .Permission
-                                .Id,
-
-                            userPermission
-                                .Permission
-                                .Name,
-
-                            userPermission
-                                .Permission
-                                .Code))
-                .ToListAsync(
-                    cancellationToken);
+                            rolePermission.Permission.Id,
+                            rolePermission.Permission.Name,
+                            rolePermission.Permission.Code))
+                .ToListAsync(cancellationToken);
 
         return Ok(permissions);
     }
 
-    /*
-     * Update permissions.
-     *
-     * SuperAdmin:
-     *      TeamLead/Admin + Employee/User.
-     *
-     * TeamLead/Admin:
-     *      Employee/User only.
-     *
-     * Employee/User:
-     *      Nobody.
-     *
-     * Self modification:
-     *      Never allowed.
-     */
-    [HttpPut("users/{userId}")]
+    // PUT: api/permissions/roles/Employee
+    // PUT: api/permissions/roles/TeamLead
+    [HttpPut("roles/{roleName}")]
     public async Task<IActionResult>
-        UpdateUserPermissions(
-            string userId,
-            [FromBody]
-            UpdateUserPermissionsRequest request,
-            CancellationToken cancellationToken)
+        UpdateRolePermissions(
+        string roleName,
+        [FromBody] UpdateRolePermissionsRequest request,
+        CancellationToken cancellationToken)
     {
         if (!CanManagePermissions())
         {
             return Forbid();
         }
 
-        string? currentUserId =
-            GetCurrentUserId();
+        string? normalizedRole =
+            NormalizeRole(roleName);
 
-        if (string.IsNullOrWhiteSpace(
-                currentUserId))
-        {
-            return Unauthorized();
-        }
-
-        /*
-         * Critical security rule:
-         * no account can modify itself.
-         */
-        if (string.Equals(
-                currentUserId,
-                userId,
-                StringComparison.Ordinal))
+        if (normalizedRole is null)
         {
             return BadRequest(
                 new
                 {
-                    message =
-                        "You cannot modify your own permissions."
+                    message = "The selected role is invalid."
                 });
         }
 
-        ApplicationUser? targetUser =
-            await _userManager
-                .FindByIdAsync(
-                    userId);
-
-        if (targetUser is null)
-        {
-            return NotFound(
-                new
-                {
-                    message =
-                        "User was not found."
-                });
-        }
-
-        IList<string> targetRoles =
-            await _userManager
-                .GetRolesAsync(
-                    targetUser);
-
-        string? targetRole =
-            GetPrimaryRole(
-                targetRoles);
-
-        if (targetRole is null)
-        {
-            return BadRequest(
-                new
-                {
-                    message =
-                        "The selected account does not have a supported role."
-                });
-        }
-
-        if (!CanManageRole(
-                targetRole))
+        if (!CanManageRole(normalizedRole))
         {
             return Forbid();
         }
 
+        IdentityRole? role =
+            await _roleManager.FindByNameAsync(
+                normalizedRole);
+
+        if (role is null)
+        {
+            return NotFound(
+                new
+                {
+                    message = "The selected role was not found."
+                });
+        }
+
         int[] requestedPermissionIds =
-            request
-                .PermissionIds
+            request.PermissionIds
                 .Distinct()
                 .ToArray();
 
@@ -370,17 +211,14 @@ public sealed class PermissionsController
                 .Permissions
                 .Where(
                     permission =>
-                        requestedPermissionIds
-                            .Contains(
-                                permission.Id))
+                        requestedPermissionIds.Contains(
+                            permission.Id))
                 .Select(
                     permission =>
                         permission.Id)
-                .ToListAsync(
-                    cancellationToken);
+                .ToListAsync(cancellationToken);
 
-        if (
-            validPermissionIds.Count !=
+        if (validPermissionIds.Count !=
             requestedPermissionIds.Length)
         {
             return BadRequest(
@@ -391,30 +229,65 @@ public sealed class PermissionsController
                 });
         }
 
-        List<UserPermission> currentPermissions =
+        /*
+         * Employees must never receive employee
+         * management/delete permissions.
+         */
+        if (string.Equals(
+                normalizedRole,
+                AppRoles.Employee,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            bool containsRestrictedPermission =
+                await _dbContext
+                    .Permissions
+                    .AnyAsync(
+                        permission =>
+                            validPermissionIds.Contains(
+                                permission.Id) &&
+                            (
+                                permission.Code ==
+                                    "employees.manage" ||
+                                permission.Code ==
+                                    "employees.delete"
+                            ),
+                        cancellationToken);
+
+            if (containsRestrictedPermission)
+            {
+                return BadRequest(
+                    new
+                    {
+                        message =
+                            "Employee role cannot receive employee manage or delete permissions."
+                    });
+            }
+        }
+
+        List<RolePermission> currentPermissions =
             await _dbContext
-                .UserPermissions
+                .RolePermissions
                 .Where(
-                    userPermission =>
-                        userPermission.UserId == userId)
+                    rolePermission =>
+                        rolePermission.RoleId == role.Id)
                 .ToListAsync(cancellationToken);
 
         HashSet<int> currentPermissionIds =
             currentPermissions
                 .Select(
-                    userPermission =>
-                        userPermission.PermissionId)
+                    rolePermission =>
+                        rolePermission.PermissionId)
                 .ToHashSet();
 
         HashSet<int> requestedPermissionIdSet =
             validPermissionIds.ToHashSet();
 
-        List<UserPermission> permissionsToRemove =
+        List<RolePermission> permissionsToRemove =
             currentPermissions
                 .Where(
-                    userPermission =>
+                    rolePermission =>
                         !requestedPermissionIdSet.Contains(
-                            userPermission.PermissionId))
+                            rolePermission.PermissionId))
                 .ToList();
 
         IEnumerable<int> permissionIdsToAdd =
@@ -425,140 +298,83 @@ public sealed class PermissionsController
                             permissionId));
 
         _dbContext
-            .UserPermissions
-            .RemoveRange(
-                permissionsToRemove);
+            .RolePermissions
+            .RemoveRange(permissionsToRemove);
 
         foreach (int permissionId in permissionIdsToAdd)
         {
             _dbContext
-                .UserPermissions
+                .RolePermissions
                 .Add(
-                    new UserPermission
+                    new RolePermission
                     {
-                        UserId = userId,
+                        RoleId = role.Id,
                         PermissionId = permissionId
                     });
         }
 
         await _dbContext
-            .SaveChangesAsync(
-                cancellationToken);
+            .SaveChangesAsync(cancellationToken);
 
-        return NoContent(); 
-        }
+        return NoContent();
+    }
 
-    /*
-     * Only SuperAdmin and TeamLead/Admin
-     * are permission administrators.
-     */
     private bool CanManagePermissions()
     {
         return
-            User.IsInRole(
-                AppRoles.SuperAdmin) ||
-            User.IsInRole(
-                AppRoles.TeamLead);
+            User.IsInRole(AppRoles.SuperAdmin) ||
+            User.IsInRole(AppRoles.TeamLead);
     }
 
-    /*
-     * Determines whether the currently
-     * authenticated user can manage the
-     * TARGET account's role.
-     */
     private bool CanManageRole(
-        string targetRole)
+        string roleName)
     {
-        /*
-         * SuperAdmin:
-         *
-         * Can manage TeamLead/Admin
-         * and Employee/User.
-         *
-         * Cannot manage another SuperAdmin
-         * through this permission API.
-         */
-        if (
-            User.IsInRole(
-                AppRoles.SuperAdmin))
+        // SuperAdmin can configure TeamLead + Employee.
+        if (User.IsInRole(AppRoles.SuperAdmin))
         {
             return
                 string.Equals(
-                    targetRole,
+                    roleName,
                     AppRoles.TeamLead,
-                    StringComparison
-                        .OrdinalIgnoreCase) ||
+                    StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(
-                    targetRole,
+                    roleName,
                     AppRoles.Employee,
-                    StringComparison
-                        .OrdinalIgnoreCase);
+                    StringComparison.OrdinalIgnoreCase);
         }
 
-        /*
-         * TeamLead/Admin:
-         *
-         * Can manage Employee/User only.
-         */
-        if (
-            User.IsInRole(
-                AppRoles.TeamLead))
+        // TeamLead can configure Employee only.
+        if (User.IsInRole(AppRoles.TeamLead))
         {
             return string.Equals(
-                targetRole,
+                roleName,
                 AppRoles.Employee,
-                StringComparison
-                    .OrdinalIgnoreCase);
+                StringComparison.OrdinalIgnoreCase);
         }
 
         return false;
     }
 
-    /*
-     * TeamLead users also have Employee
-     * role in your current system.
-     *
-     * Therefore TeamLead must be checked
-     * before Employee.
-     */
-    private static string?
-        GetPrimaryRole(
-            IEnumerable<string> roles)
+    private static string? NormalizeRole(
+        string roleName)
     {
-        HashSet<string> assignedRoles =
-            roles.ToHashSet(
-                StringComparer
-                    .OrdinalIgnoreCase);
-
-        if (
-            assignedRoles.Contains(
-                AppRoles.SuperAdmin))
-        {
-            return AppRoles.SuperAdmin;
-        }
-
-        if (
-            assignedRoles.Contains(
-                AppRoles.TeamLead))
-        {
-            return AppRoles.TeamLead;
-        }
-
-        if (
-            assignedRoles.Contains(
-                AppRoles.Employee))
+        if (string.Equals(
+                roleName,
+                AppRoles.Employee,
+                StringComparison.OrdinalIgnoreCase))
         {
             return AppRoles.Employee;
         }
 
-        return null;
-    }
+        if (string.Equals(
+                roleName,
+                AppRoles.TeamLead,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return AppRoles.TeamLead;
+        }
 
-    private string?
-        GetCurrentUserId()
-    {
-        return User.FindFirstValue(
-            ClaimTypes.NameIdentifier);
+        return null;
     }
 
     public sealed record PermissionResponse(
@@ -566,14 +382,11 @@ public sealed class PermissionsController
         string Name,
         string Code);
 
-    public sealed record PermissionUserResponse(
-        string Id,
+    public sealed record RoleResponse(
         string Name,
-        string Email,
-        string Role);
+        string DisplayName);
 
-    public sealed class
-        UpdateUserPermissionsRequest
+    public sealed class UpdateRolePermissionsRequest
     {
         public IReadOnlyCollection<int>
             PermissionIds { get; init; } =

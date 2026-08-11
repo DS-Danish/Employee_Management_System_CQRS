@@ -25,7 +25,6 @@ import {
   IconButton,
   List,
   ListItem,
-  ListItemAvatar,
   ListItemText,
   Paper,
   Snackbar,
@@ -182,6 +181,17 @@ export default function DepartmentsPage():
     if (!trimmedName) {
       setError(
         "Department name is required.",
+      );
+
+      return;
+    }
+
+    if (
+      selectedDepartment &&
+      trimmedName === selectedDepartment.name.trim()
+    ) {
+      setError(
+        "No changes were made.",
       );
 
       return;
@@ -597,22 +607,10 @@ export default function DepartmentsPage():
                         </Stack>
                       }
                     >
-                      <ListItemAvatar>
-                        <Avatar
-                          sx={{
-                            bgcolor:
-                              "primary.main",
-                          }}
-                        >
-                          <ApartmentIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-
                       <ListItemText
                         primary={
                           department.name
                         }
-                        secondary="Department"
                         slotProps={{
                           primary: {
                             sx: {
@@ -724,7 +722,11 @@ export default function DepartmentsPage():
             disableElevation
             disabled={
               saving ||
-              !name.trim()
+              !name.trim() ||
+              Boolean(
+                selectedDepartment &&
+                name.trim() === selectedDepartment.name.trim()
+              )
             }
             onClick={() =>
               void handleSave()
