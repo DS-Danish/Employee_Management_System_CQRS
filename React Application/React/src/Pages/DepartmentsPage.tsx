@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -23,10 +24,13 @@ import {
   DialogContentText,
   DialogTitle,
   IconButton,
-  List,
-  ListItem,
-  ListItemText,
   Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Snackbar,
   Stack,
   TextField,
@@ -102,6 +106,98 @@ export default function DepartmentsPage():
     successMessage,
     setSuccessMessage,
   ] = useState<string>("");
+
+  const DEPARTMENTS_PER_BATCH = 10;
+
+  const [
+    visibleDepartmentCount,
+    setVisibleDepartmentCount,
+  ] = useState<number>(
+    DEPARTMENTS_PER_BATCH,
+  );
+
+  const scrollContainerRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  const loadMoreTriggerRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  const displayedDepartments:
+    Department[] =
+    departments.slice(
+      0,
+      visibleDepartmentCount,
+    );
+
+  const hasMoreDepartments:
+    boolean =
+    visibleDepartmentCount <
+    departments.length;
+
+  useEffect(() => {
+    setVisibleDepartmentCount(
+      DEPARTMENTS_PER_BATCH,
+    );
+  }, [departments]);
+
+  useEffect(() => {
+    const trigger:
+      HTMLDivElement | null =
+      loadMoreTriggerRef.current;
+
+    if (
+      !trigger ||
+      !hasMoreDepartments
+    ) {
+      return;
+    }
+
+    const observer =
+      new IntersectionObserver(
+        (
+          entries:
+            IntersectionObserverEntry[],
+        ): void => {
+          const entry:
+            IntersectionObserverEntry | undefined =
+            entries[0];
+
+          if (entry?.isIntersecting) {
+            setVisibleDepartmentCount(
+              (
+                currentCount:
+                  number,
+              ): number =>
+                Math.min(
+                  currentCount +
+                    DEPARTMENTS_PER_BATCH,
+                  departments.length,
+                ),
+            );
+          }
+        },
+        {
+          root:
+            scrollContainerRef.current,
+          rootMargin:
+            "150px 0px",
+          threshold: 0.1,
+        },
+      );
+
+    observer.observe(trigger);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    departments.length,
+    hasMoreDepartments,
+  ]);
 
   const loadDepartments =
     useCallback(
@@ -321,130 +417,76 @@ export default function DepartmentsPage():
     );
 
   return (
-    <Box
-      sx={{
-        bgcolor: "#FAFAFA",
-        minHeight: "100%",
-      }}
-    >
-      <Container
-        maxWidth="xl"
-        sx={{
-          py: 5,
-        }}
-      >
+    <Box sx={{ bgcolor: "#F8FAFC", minHeight: "100%" }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}>
         <Stack spacing={3}>
           <Paper
             elevation={0}
             sx={{
-              p: {
-                xs: 2.5,
-                sm: 3.5,
-              },
+              p: { xs: 3, md: 4 },
               borderRadius: 3,
-              border:
-                "1px solid",
-              borderColor:
-                "divider",
-              background:
-                "linear-gradient(135deg, #FFFFFF 0%, #F7F7FB 100%)",
+              background: "linear-gradient(135deg, #1976d2 0%, #512da8 100%)",
+              color: "common.white",
             }}
           >
             <Box
               sx={{
                 display: "flex",
-                flexDirection: {
-                  xs: "column",
-                  sm: "row",
-                },
-                justifyContent:
-                  "space-between",
-                alignItems: {
-                  xs: "stretch",
-                  sm: "center",
-                },
+                flexDirection: { xs: "column", sm: "row" },
+                justifyContent: "space-between",
+                alignItems: { xs: "stretch", sm: "center" },
                 gap: 2,
               }}
             >
               <Box>
                 <Typography
-                  component="h1"
-                  variant="h4"
-                  sx={{
-                    fontWeight: 700,
-                    letterSpacing:
-                      -0.6,
-                  }}
+                  variant="overline"
+                  sx={{ opacity: 0.8, letterSpacing: 1.5 }}
                 >
+                  Department Management
+                </Typography>
+
+                <Typography component="h1" variant="h4" sx={{ fontWeight: 700 }}>
                   Departments
                 </Typography>
 
-                <Typography
-                  color="text.secondary"
-                  sx={{
-                    mt: 0.5,
-                  }}
-                >
-                  Create, update and
-                  manage organisation
-                  departments.
+                <Typography sx={{ mt: 1, opacity: 0.9 }}>
+                  Create, update and manage organisation departments.
                 </Typography>
               </Box>
 
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{
-                  alignItems:
-                    "center",
-                }}
-              >
-                <Tooltip title="Refresh departments">
-                  <span>
-                    <IconButton
-                      type="button"
-                      aria-label="Refresh departments"
-                      disabled={
-                        loading
-                      }
-                      onClick={() =>
-                        void loadDepartments()
-                      }
-                      sx={{
-                        border:
-                          "1px solid",
-                        borderColor:
-                          "divider",
-                        bgcolor:
-                          "background.paper",
-                      }}
-                    >
-                      {loading ? (
-                        <CircularProgress
-                          size={22}
-                        />
-                      ) : (
-                        <RefreshIcon />
-                      )}
-                    </IconButton>
-                  </span>
-                </Tooltip>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  disabled={loading}
+                  onClick={() => void loadDepartments()}
+                  sx={{
+                    color: "common.white",
+                    borderColor: "rgba(255,255,255,0.6)",
+                    "&:hover": {
+                      borderColor: "common.white",
+                      bgcolor: "rgba(255,255,255,0.08)",
+                    },
+                  }}
+                >
+                  Refresh
+                </Button>
 
                 <Button
                   type="button"
                   variant="contained"
                   disableElevation
-                  startIcon={
-                    <AddIcon />
-                  }
-                  onClick={
-                    handleCreate
-                  }
+                  startIcon={<AddIcon />}
+                  onClick={handleCreate}
                   sx={{
-                    borderRadius: 2,
+                    bgcolor: "common.white",
+                    color: "primary.main",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.92)" },
                   }}
                 >
-                  Add department
+                  Add Department
                 </Button>
               </Stack>
             </Box>
@@ -540,90 +582,164 @@ export default function DepartmentsPage():
                 </Button>
               </Box>
             ) : (
-              <List disablePadding>
-                {departments.map(
-                  (
-                    department:
-                      Department,
-                  ) => (
-                    <ListItem
-                      key={
-                        department.id
-                      }
-                      divider
-                      secondaryAction={
-                        <Stack
-                          direction="row"
-                          spacing={0.5}
-                          sx={{
-                            alignItems:
-                              "center",
-                          }}
-                        >
-                          <Tooltip title="Edit department">
-                            <IconButton
-                              type="button"
-                              aria-label={`Edit ${department.name}`}
-                              onClick={() =>
-                                handleEdit(
-                                  department,
-                                )
-                              }
-                            >
-                              <EditIcon />
-                            </IconButton>
-                          </Tooltip>
+              <TableContainer
+                ref={scrollContainerRef}
+                sx={{
+                  maxHeight: {
+                    xs: "58vh",
+                    md: "56vh",
+                  },
+                  overflowY: "auto",
+                  overscrollBehavior:
+                    "contain",
+                  scrollbarGutter:
+                    "stable",
+                }}
+              >
+                <Table stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>
+                        Sr. No
+                      </TableCell>
 
-                          <Tooltip title="Delete department">
-                            <span>
-                              <IconButton
-                                type="button"
-                                color="error"
-                                aria-label={`Delete ${department.name}`}
-                                disabled={
-                                  deletingId ===
-                                  department.id
-                                }
-                                onClick={() =>
-                                  handleDeleteRequest(
-                                    department,
-                                  )
-                                }
-                              >
-                                {deletingId ===
-                                department.id ? (
-                                  <CircularProgress
-                                    size={
-                                      20
-                                    }
-                                    color="inherit"
-                                  />
-                                ) : (
-                                  <DeleteIcon />
-                                )}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        </Stack>
-                      }
-                    >
-                      <ListItemText
-                        primary={
-                          department.name
-                        }
-                        slotProps={{
-                          primary: {
-                            sx: {
-                              fontWeight:
-                                600,
-                            },
-                          },
+                      <TableCell>
+                        Department
+                      </TableCell>
+
+                      <TableCell
+                        align="center"
+                        sx={{
+                          width: 140,
+                          minWidth: 140,
                         }}
-                      />
-                    </ListItem>
-                  ),
-                )}
-              </List>
+                      >
+                        Actions
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+
+                  <TableBody>
+                    {displayedDepartments.map(
+                      (
+                        department:
+                          Department,
+                        index:
+                          number,
+                      ) => (
+                        <TableRow
+                          key={
+                            department.id
+                          }
+                          hover
+                        >
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight:
+                                  600,
+                                color:
+                                  "text.secondary",
+                                fontVariantNumeric:
+                                  "tabular-nums",
+                                letterSpacing:
+                                  0.4,
+                              }}
+                            >
+                              {String(
+                                index + 1,
+                              ).padStart(
+                                3,
+                                "0",
+                              )}
+                            </Typography>
+                          </TableCell>
+
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight:
+                                  600,
+                              }}
+                            >
+                              {
+                                department.name
+                              }
+                            </Typography>
+                          </TableCell>
+
+                          <TableCell
+                            align="center"
+                            sx={{
+                              width: 140,
+                              minWidth: 140,
+                            }}
+                          >
+                            <Stack
+                              direction="row"
+                              spacing={0.5}
+                              sx={{
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Tooltip title="Edit department">
+                                <IconButton
+                                  type="button"
+                                  aria-label={`Edit ${department.name}`}
+                                  onClick={() =>
+                                    handleEdit(
+                                      department,
+                                    )
+                                  }
+                                >
+                                  <EditIcon />
+                                </IconButton>
+                              </Tooltip>
+
+                              <Tooltip title="Delete department">
+                                <span>
+                                  <IconButton
+                                    type="button"
+                                    color="error"
+                                    aria-label={`Delete ${department.name}`}
+                                    disabled={
+                                      deletingId ===
+                                      department.id
+                                    }
+                                    onClick={() =>
+                                      handleDeleteRequest(
+                                        department,
+                                      )
+                                    }
+                                  >
+                                    {deletingId ===
+                                    department.id ? (
+                                      <CircularProgress
+                                        size={20}
+                                        color="inherit"
+                                      />
+                                    ) : (
+                                      <DeleteIcon />
+                                    )}
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
+                  </TableBody>
+                </Table>
+
+                <Box
+                  ref={loadMoreTriggerRef}
+                  sx={{ height: 1 }}
+                />
+              </TableContainer>
             )}
           </Paper>
         </Stack>

@@ -64,10 +64,18 @@ export interface StoredUser {
 
 export interface ApiErrorResponse {
   message?: string;
-
   title?: string;
-
   errors?:
     | string[]
     | Record<string, string[]>;
+}
+
+export interface SystemUser {
+  userId: string;
+  employeeId: string | null;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  departmentId: string | null;
+  departmentName: string | null;
 }

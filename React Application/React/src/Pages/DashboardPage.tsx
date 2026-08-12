@@ -1,1860 +1,1439 @@
 import {
+  useCallback,
   useEffect,
+  useMemo,
   useState,
+  type ReactNode,
 } from "react";
 
-import type {
-  ChangeEvent,
-  CSSProperties,
-  FormEvent,
-} from "react";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import InsightsIcon from "@mui/icons-material/Insights";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
 
 import {
-  Navigate,
-  useNavigate,
-} from "react-router-dom";
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Container,
+  FormControl,
+  Grid,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Skeleton,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 import {
-  AppPermissions,
-} from "../Constants/permissions";
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip as ChartTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
+import { getEmployeeProjects } from "../services/employeeProjectService";
+import { getMyLeaveBalance } from "../services/leaveService";
+import { completeProject, getProjects } from "../services/projectService";
+
+import type { StoredUser } from "../Types/auth";
+import { getLeaveTypeLabel, type LeaveBalance } from "../Types/leave";
 import type {
-  StoredUser,
-} from "../Types/auth";
+  EmployeeProject,
+  Project,
+} from "../Types/project";
 
-interface EmployeeProfile {
-  id: string;
-  firstName: string;
-  lastName: string;
-  fullName: string;
-  email: string;
-
-  street: string;
-  city: string;
-  country: string;
-  postalCode: string;
-
-  departmentId: string | null;
-  departmentName: string | null;
-
-  createdAtUtc: string;
+interface LeaveChartItem {
+  name: string;
+  value: number;
+  color: string;
 }
 
-interface ProfileForm {
-  firstName: string;
-  lastName: string;
-
-  street: string;
-  city: string;
-  country: string;
-  postalCode: string;
-}
-
-interface ApiError {
-  message?: string;
-  title?: string;
-
-  errors?:
-    | string[]
-    | Record<string, string[]>;
-}
-
-interface FormFieldProps {
-  label: string;
-
-  name:
-    | keyof ProfileForm
-    | "email"
-    | "department";
-
-  value: string;
-
-  disabled?: boolean;
-  required?: boolean;
-
-  onChange?: (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => void;
-}
-
-interface ModuleCard {
-  title: string;
-  description: string;
-  path: string;
-  permission: string;
-}
-
-const TOKEN_KEY =
-  "authToken";
-
-const USER_KEY =
-  "authUser";
-
-const API_BASE_URL =
-  (
-    import.meta.env.VITE_API_BASE_URL ??
-    ""
-  ).replace(
-    /\/+$/,
-    "",
-  );
-
-const emptyProfileForm: ProfileForm = {
-  firstName: "",
-  lastName: "",
-  street: "",
-  city: "",
-  country: "",
-  postalCode: "",
-};
-
-const applicationModules: ModuleCard[] = [
-  {
-    title:
-      "Employees",
-
-    description:
-      "View employee information available to your account.",
-
-    path:
-      "/employee/employees",
-
-    permission:
-      AppPermissions.ViewEmployees,
-  },
-  {
-    title:
-      "Departments",
-
-    description:
-      "View departments and organizational information.",
-
-    path:
-      "/employee/departments",
-
-    permission:
-      AppPermissions.ViewDepartments,
-  },
-  {
-    title:
-      "Projects",
-
-    description:
-      "View projects available to your account.",
-
-    path:
-      "/employee/projects",
-
-    permission:
-      AppPermissions.ViewProjects,
-  },
-];
+const ACCENT_INDIGO = "#4F46E5";
+const ACCENT_VIOLET = "#7C3AED";
+const ACCENT_AMBER = "#D97706";
+const ACCENT_GREEN = "#16A34A";
 
 export default function DashboardPage():
   React.ReactElement {
-  const navigate =
-    useNavigate();
-
-  const token =
-    localStorage.getItem(
-      TOKEN_KEY,
-    );
-
-  const storedUserJson =
-    localStorage.getItem(
-      USER_KEY,
-    );
+  const currentUser:
+    StoredUser | null =
+    getStoredUser();
 
   const [
-    currentUser,
-    setCurrentUser,
-  ] =
-    useState<StoredUser | null>(
-      () => {
-        if (!storedUserJson) {
-          return null;
-        }
+    leaveBalances,
+    setLeaveBalances,
+  ] = useState<LeaveBalance[]>([]);
 
-        try {
-          const parsedUser =
-            JSON.parse(
-              storedUserJson,
-            ) as StoredUser;
-
-          return {
-            ...parsedUser,
-
-            permissions:
-              Array.isArray(
-                parsedUser.permissions,
-              )
-                ? parsedUser.permissions
-                : [],
-          };
-        } catch {
-          return null;
-        }
-      },
-    );
+const [
+    assignedProjects,
+    setAssignedProjects,
+  ] = useState<Project[]>([]);
 
   const [
-    profile,
-    setProfile,
-  ] =
-    useState<EmployeeProfile | null>(
-      null,
-    );
+    selectedProjectId,
+    setSelectedProjectId,
+  ] = useState<string>("");
 
   const [
-    form,
-    setForm,
-  ] =
-    useState<ProfileForm>({
-      ...emptyProfileForm,
-    });
+    completingProjectId,
+    setCompletingProjectId,
+  ] = useState<string | null>(null);
 
   const [
-    originalForm,
-    setOriginalForm,
-  ] =
-    useState<ProfileForm>({
-      ...emptyProfileForm,
-    });
-
-  const [
-    isLoading,
-    setIsLoading,
-  ] =
-    useState<boolean>(
-      true,
-    );
-
-  const [
-    isSaving,
-    setIsSaving,
-  ] =
-    useState<boolean>(
-      false,
-    );
+    loading,
+    setLoading,
+  ] = useState<boolean>(true);
 
   const [
     error,
     setError,
-  ] =
-    useState<string>("");
+  ] = useState<string>("");
 
-  const [
-    success,
-    setSuccess,
-  ] =
-    useState<string>("");
-
-  const profileHasChanged =
-    hasProfileChanged(
-      form,
-      originalForm,
+  const currentYear: number =
+    useMemo(
+      () => new Date().getFullYear(),
+      [],
     );
 
-  const visibleModules: ModuleCard[] =
-    currentUser
-      ? applicationModules.filter(
-          module =>
-            currentUser.permissions.includes(
-              module.permission,
+  const loadDashboard =
+    useCallback(
+      async (): Promise<void> => {
+        setLoading(true);
+        setError("");
+
+        try {
+          if (
+            !currentUser?.employeeId
+          ) {
+            throw new Error(
+              "Your user account is not linked to an employee record.",
+            );
+          }
+
+          const [
+            leaveBalanceResult,
+            projectAssignments,
+            allProjects,
+          ] = await Promise.all([
+            getMyLeaveBalance(
+              currentYear,
             ),
-        )
-      : [];
+            getEmployeeProjects(
+              currentUser.employeeId,
+            ),
+            getProjects(),
+          ]);
+
+          const projectIds =
+            new Set<string>(
+              projectAssignments.map(
+                (
+                  assignment:
+                    EmployeeProject,
+                ): string =>
+                  assignment.projectId,
+              ),
+            );
+
+          const employeeProjects:
+            Project[] =
+            allProjects.filter(
+              (
+                project:
+                  Project,
+              ): boolean =>
+                projectIds.has(
+                  project.id,
+                ),
+            );
+
+          setLeaveBalances(
+            leaveBalanceResult,
+          );
+
+          setAssignedProjects(
+            employeeProjects,
+          );
+
+          setSelectedProjectId(
+            (
+              currentProjectId:
+                string,
+            ): string => {
+              if (
+                currentProjectId &&
+                employeeProjects.some(
+                  (
+                    project:
+                      Project,
+                  ): boolean =>
+                    project.id ===
+                    currentProjectId,
+                )
+              ) {
+                return currentProjectId;
+              }
+
+              return (
+                employeeProjects[0]
+                  ?.id ?? ""
+              );
+            },
+          );
+        } catch (
+          caughtError: unknown
+        ) {
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Unable to load dashboard information.",
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+      [
+        currentUser?.employeeId,
+        currentYear,
+      ],
+    );
+
+  async function handleCompleteProject(
+    project: Project,
+  ): Promise<void> {
+    if (
+      isProjectCompleted(project) ||
+      completingProjectId === project.id
+    ) {
+      return;
+    }
+
+    setCompletingProjectId(
+      project.id,
+    );
+    setError("");
+
+    try {
+      await completeProject(
+        project.id,
+      );
+
+      setAssignedProjects(
+        (
+          currentProjects:
+            Project[],
+        ): Project[] =>
+          currentProjects.map(
+            (
+              currentProject:
+                Project,
+            ): Project =>
+              currentProject.id ===
+              project.id
+                ? {
+                    ...currentProject,
+                    status:
+                      "Completed",
+                  }
+                : currentProject,
+          ),
+      );
+    } catch (
+      caughtError: unknown
+    ) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to mark the project as completed.",
+      );
+    } finally {
+      setCompletingProjectId(
+        null,
+      );
+    }
+  }
 
   useEffect(() => {
-    if (
-      !token ||
-      !currentUser
-    ) {
-      setIsLoading(
-        false,
-      );
+    void loadDashboard();
+  }, [loadDashboard]);
 
-      return;
-    }
-
-    void loadProfile();
-  }, []);
-
-  if (
-    !token ||
-    !currentUser
-  ) {
-    clearAuthentication();
-
-    return (
-      <Navigate
-        to="/login"
-        replace
-      />
-    );
-  }
-
-  async function loadProfile():
-    Promise<void> {
-    if (!token) {
-      setIsLoading(
-        false,
-      );
-
-      return;
-    }
-
-    setError("");
-
-    try {
-      const response =
-        await fetch(
-          `${API_BASE_URL}/employees/me`,
+  const leaveChartData:
+    LeaveChartItem[] =
+    useMemo(
+      () => {
+        const leaveTypes:
+          Array<{
+            name: string;
+            color: string;
+          }> = [
           {
-            method:
-              "GET",
+            name: "Annual",
+            color:
+              ACCENT_INDIGO,
+          },
+          {
+            name: "Casual",
+            color:
+              ACCENT_AMBER,
+          },
+          {
+            name: "Sick",
+            color:
+              ACCENT_GREEN,
+          },
+        ];
 
-            headers: {
-              Authorization:
-                `Bearer ${token}`,
+        return leaveTypes.map(
+          (
+            leaveType: {
+              name: string;
+              color: string;
             },
+          ): LeaveChartItem => {
+            const balance:
+              LeaveBalance | undefined =
+              leaveBalances.find(
+                (
+                  item:
+                    LeaveBalance,
+                ): boolean =>
+                  getLeaveTypeLabel(
+                    item.leaveType,
+                  )
+                    .trim()
+                    .toLowerCase() ===
+                  leaveType.name
+                    .toLowerCase(),
+              );
+
+            return {
+              name:
+                leaveType.name,
+              value:
+                balance?.remainingDays ??
+                0,
+              color:
+                leaveType.color,
+            };
           },
         );
-
-      const responseBody =
-        await readResponseBody(
-          response,
-        );
-
-      if (!response.ok) {
-        if (
-          response.status ===
-          401
-        ) {
-          clearAuthentication();
-
-          navigate(
-            "/login",
-            {
-              replace:
-                true,
-            },
-          );
-
-          return;
-        }
-
-        throw new Error(
-          getErrorMessage(
-            responseBody,
-            "Your employee profile could not be loaded.",
-          ),
-        );
-      }
-
-      const employeeProfile =
-        responseBody as EmployeeProfile;
-
-      const loadedForm =
-        createFormFromProfile(
-          employeeProfile,
-        );
-
-      setProfile(
-        employeeProfile,
-      );
-
-      setForm(
-        loadedForm,
-      );
-
-      setOriginalForm(
-        loadedForm,
-      );
-    } catch (
-      caughtError:
-        unknown
-    ) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Your employee profile could not be loaded.",
-      );
-    } finally {
-      setIsLoading(
-        false,
-      );
-    }
-  }
-
-  function handleInputChange(
-    event:
-      ChangeEvent<HTMLInputElement>,
-  ): void {
-    const fieldName =
-      event.target.name as keyof ProfileForm;
-
-    const fieldValue =
-      event.target.value;
-
-    setForm(
-      currentForm => ({
-        ...currentForm,
-
-        [fieldName]:
-          fieldValue,
-      }),
-    );
-
-    setError("");
-    setSuccess("");
-  }
-
-  async function handleSubmit(
-    event:
-      FormEvent<HTMLFormElement>,
-  ): Promise<void> {
-    event.preventDefault();
-
-    setError("");
-    setSuccess("");
-
-    /*
-     * currentUser is StoredUser | null.
-     *
-     * Check it again inside this async
-     * handler so TypeScript can safely
-     * treat it as StoredUser.
-     */
-    if (
-      !currentUser ||
-      !token
-    ) {
-      clearAuthentication();
-
-      navigate(
-        "/login",
-        {
-          replace:
-            true,
-        },
-      );
-
-      return;
-    }
-
-    /*
-     * Capture a guaranteed StoredUser
-     * before entering async operations.
-     */
-    const authenticatedUser:
-      StoredUser =
-      currentUser;
-
-    const normalizedForm =
-      normalizeProfileForm(
-        form,
-      );
-
-    if (
-      !normalizedForm.firstName
-    ) {
-      setError(
-        "First name is required.",
-      );
-
-      return;
-    }
-
-    if (
-      !normalizedForm.lastName
-    ) {
-      setError(
-        "Last name is required.",
-      );
-
-      return;
-    }
-
-    if (
-      !hasProfileChanged(
-        normalizedForm,
-        originalForm,
-      )
-    ) {
-      setError(
-        "No changes were made.",
-      );
-
-      return;
-    }
-
-    setIsSaving(
-      true,
-    );
-
-    try {
-      const response =
-        await fetch(
-          `${API_BASE_URL}/employees/me`,
-          {
-            method:
-              "PUT",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-
-              Authorization:
-                `Bearer ${token}`,
-            },
-
-            body:
-              JSON.stringify(
-                normalizedForm,
-              ),
-          },
-        );
-
-      const responseBody =
-        await readResponseBody(
-          response,
-        );
-
-      if (!response.ok) {
-        if (
-          response.status ===
-          401
-        ) {
-          clearAuthentication();
-
-          navigate(
-            "/login",
-            {
-              replace:
-                true,
-            },
-          );
-
-          return;
-        }
-
-        throw new Error(
-          getErrorMessage(
-            responseBody,
-            "Your profile could not be updated.",
-          ),
-        );
-      }
-
-      const updatedFullName =
-        `${normalizedForm.firstName} ${normalizedForm.lastName}`;
-
-      /*
-       * authenticatedUser is guaranteed
-       * to be StoredUser, so spreading it
-       * keeps all required properties:
-       *
-       * userId
-       * email
-       * role
-       * departmentId
-       * employeeId
-       * expiresAtUtc
-       * permissions
-       */
-      const updatedUser:
-        StoredUser = {
-        ...authenticatedUser,
-
-        fullName:
-          updatedFullName,
-      };
-
-      localStorage.setItem(
-        USER_KEY,
-        JSON.stringify(
-          updatedUser,
-        ),
-      );
-
-      setCurrentUser(
-        updatedUser,
-      );
-
-      setForm(
-        normalizedForm,
-      );
-
-      setOriginalForm(
-        normalizedForm,
-      );
-
-      setProfile(
-        currentProfile => {
-          if (!currentProfile) {
-            return currentProfile;
-          }
-
-          return {
-            ...currentProfile,
-
-            firstName:
-              normalizedForm.firstName,
-
-            lastName:
-              normalizedForm.lastName,
-
-            fullName:
-              updatedFullName,
-
-            street:
-              normalizedForm.street,
-
-            city:
-              normalizedForm.city,
-
-            country:
-              normalizedForm.country,
-
-            postalCode:
-              normalizedForm.postalCode,
-          };
-        },
-      );
-
-      setSuccess(
-        "Your details were updated successfully.",
-      );
-    } catch (
-      caughtError:
-        unknown
-    ) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Your profile could not be updated.",
-      );
-    } finally {
-      setIsSaving(
-        false,
-      );
-    }
-  }
-
-  function handleReset():
-    void {
-    setForm({
-      ...originalForm,
-    });
-
-    setError("");
-    setSuccess("");
-  }
-
-  function handleLogout():
-    void {
-    clearAuthentication();
-
-    navigate(
-      "/login",
-      {
-        replace:
-          true,
       },
+      [leaveBalances],
     );
-  }
 
-  return (
-    <main
-      style={
-        styles.page
-      }
+  const totalRemainingLeaveDays:
+    number =
+    leaveChartData.reduce(
+      (
+        total: number,
+        item: LeaveChartItem,
+      ): number =>
+        total + item.value,
+      0,
+    );
+
+  const selectedProject:
+    Project | null =
+    useMemo(
+      () =>
+        assignedProjects.find(
+          (
+            project:
+              Project,
+          ): boolean =>
+            project.id ===
+            selectedProjectId,
+        ) ?? null,
+      [
+        assignedProjects,
+        selectedProjectId,
+      ],
+    );
+
+  const projectProgress:
+    number | null =
+    useMemo(
+      () =>
+        selectedProject
+          ? calculateProjectTimelineProgress(
+              selectedProject,
+            )
+          : null,
+      [selectedProject],
+    );
+
+return (
+    <Box
+      sx={{
+        bgcolor: "#F5F7FB",
+        minHeight: "100%",
+      }}
     >
-      <div
-        style={
-          styles.dashboard
-        }
+      <Container
+        maxWidth="xl"
+        sx={{
+          py: {
+            xs: 3,
+            md: 5,
+          },
+        }}
       >
-        <header
-          style={
-            styles.header
-          }
-        >
-          <div>
-            <p
-              style={
-                styles.eyebrow
+        <Stack spacing={4}>
+          <DashboardHeader
+            fullName={
+              currentUser?.fullName
+            }
+            loading={loading}
+            onRefresh={() =>
+              void loadDashboard()
+            }
+          />
+
+          {error && (
+            <Alert
+              severity="error"
+              onClose={() =>
+                setError("")
               }
+              sx={{
+                borderRadius: 2,
+              }}
+            >
+              {error}
+            </Alert>
+          )}
+
+          <SectionHeading
+            title="Insights"
+            subtitle="Track your remaining leave balance and assigned project progress."
+          />
+
+          <Grid
+            container
+            spacing={3}
+          >
+            <Grid
+              size={{
+                xs: 12,
+                lg: 6,
+              }}
+            >
+              <ChartCard
+                title="Remaining leave balance"
+                icon={
+                  <EventAvailableIcon
+                    fontSize="small"
+                  />
+                }
+              >
+                {loading ? (
+                  <Skeleton
+                    variant="rounded"
+                    height={300}
+                  />
+                ) : leaveBalances.length ===
+                  0 ? (
+                  <EmptyChartState
+                    message="No leave balance information is available."
+                  />
+                ) : (
+                  <>
+                    <Box
+                      sx={{
+                        position:
+                          "relative",
+                      }}
+                    >
+                      <ResponsiveContainer
+                        width="100%"
+                        height={260}
+                      >
+                        <PieChart>
+                          <Pie
+                            data={
+                              leaveChartData
+                            }
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={
+                              65
+                            }
+                            outerRadius={
+                              95
+                            }
+                            paddingAngle={
+                              3
+                            }
+                            stroke="none"
+                          >
+                            {leaveChartData.map(
+                              (
+                                entry:
+                                  LeaveChartItem,
+                              ) => (
+                                <Cell
+                                  key={
+                                    entry.name
+                                  }
+                                  fill={
+                                    entry.color
+                                  }
+                                />
+                              ),
+                            )}
+                          </Pie>
+
+                          <ChartTooltip
+                            contentStyle={{
+                              borderRadius:
+                                12,
+                              border:
+                                "1px solid #E2E8F0",
+                              boxShadow:
+                                "0 8px 24px rgba(15, 23, 42, 0.08)",
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+
+                      <Box
+                        sx={{
+                          position:
+                            "absolute",
+                          top: "50%",
+                          left: "50%",
+                          transform:
+                            "translate(-50%, -50%)",
+                          textAlign:
+                            "center",
+                          pointerEvents:
+                            "none",
+                        }}
+                      >
+                        <Typography
+                          variant="h4"
+                          sx={{
+                            fontWeight:
+                              800,
+                            color:
+                              "#0B1120",
+                          }}
+                        >
+                          {
+                            totalRemainingLeaveDays
+                          }
+                        </Typography>
+
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color:
+                              "#64748B",
+                          }}
+                        >
+                          days remaining
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Stack
+                      direction="row"
+                      sx={{
+                        gap: 2,
+                        flexWrap:
+                          "wrap",
+                        alignItems:
+                          "center",
+                      }}
+                    >
+                      {leaveChartData.map(
+                        (
+                          item:
+                            LeaveChartItem,
+                        ) => (
+                          <Stack
+                            key={
+                              item.name
+                            }
+                            direction="row"
+                            spacing={
+                              0.75
+                            }
+                            sx={{
+                              alignItems:
+                                "center",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width:
+                                  10,
+                                height:
+                                  10,
+                                borderRadius:
+                                  "3px",
+                                bgcolor:
+                                  item.color,
+                              }}
+                            />
+
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {item.name}
+                              :{" "}
+                              {
+                                item.value
+                              }{" "}
+                              days
+                            </Typography>
+                          </Stack>
+                        ),
+                      )}
+                    </Stack>
+                  </>
+                )}
+              </ChartCard>
+            </Grid>
+
+            <Grid
+              size={{
+                xs: 12,
+                lg: 6,
+              }}
+            >
+              <ChartCard
+                title="Project progress"
+                icon={
+                  <InsightsIcon
+                    fontSize="small"
+                  />
+                }
+              >
+                {loading ? (
+                  <Skeleton
+                    variant="rounded"
+                    height={300}
+                  />
+                ) : assignedProjects.length ===
+                  0 ? (
+                  <EmptyChartState
+                    message="No project has been assigned to you yet."
+                  />
+                ) : (
+                  <Stack
+                    spacing={3}
+                  >
+                    {assignedProjects.length >=
+                      2 && (
+                      <FormControl
+                        size="small"
+                        sx={{
+                          maxWidth:
+                            340,
+                        }}
+                      >
+                        <InputLabel
+                          id="employee-project-select-label"
+                        >
+                          Project
+                        </InputLabel>
+
+                        <Select
+                          labelId="employee-project-select-label"
+                          value={
+                            selectedProjectId
+                          }
+                          label="Project"
+                          onChange={event =>
+                            setSelectedProjectId(
+                              String(
+                                event
+                                  .target
+                                  .value,
+                              ),
+                            )
+                          }
+                        >
+                          {assignedProjects.map(
+                            (
+                              project:
+                                Project,
+                            ) => (
+                              <MenuItem
+                                key={
+                                  project.id
+                                }
+                                value={
+                                  project.id
+                                }
+                              >
+                                {
+                                  project.name
+                                }
+                              </MenuItem>
+                            ),
+                          )}
+                        </Select>
+                      </FormControl>
+                    )}
+
+                    {selectedProject && (
+                      <>
+                        <Stack
+                          direction={{
+                            xs: "column",
+                            sm: "row",
+                          }}
+                          spacing={2}
+                          sx={{
+                            alignItems: {
+                              xs: "flex-start",
+                              sm: "center",
+                            },
+                            justifyContent:
+                              "space-between",
+                          }}
+                        >
+                          <Box>
+                            <Typography
+                              variant="h6"
+                              sx={{
+                                fontWeight:
+                                  700,
+                              }}
+                            >
+                              {
+                                selectedProject.name
+                              }
+                            </Typography>
+
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{
+                                mt: 0.5,
+                              }}
+                            >
+                              {formatProjectPeriod(
+                                selectedProject,
+                              )}
+                            </Typography>
+                          </Box>
+
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            sx={{
+                              alignItems:
+                                "center",
+                            }}
+                          >
+                            <Chip
+                              label={
+                                isProjectCompleted(
+                                  selectedProject,
+                                )
+                                  ? "Completed"
+                                  : "Ongoing"
+                              }
+                              color={
+                                isProjectCompleted(
+                                  selectedProject,
+                                )
+                                  ? "success"
+                                  : "primary"
+                              }
+                              variant="outlined"
+                            />
+
+                            {!isProjectCompleted(
+                              selectedProject,
+                            ) && (
+                              <Button
+                                type="button"
+                                size="small"
+                                variant="contained"
+                                color="success"
+                                disableElevation
+                                disabled={
+                                  completingProjectId ===
+                                  selectedProject.id
+                                }
+                                startIcon={
+                                  completingProjectId ===
+                                  selectedProject.id ? (
+                                    <CircularProgress
+                                      size={15}
+                                      color="inherit"
+                                    />
+                                  ) : (
+                                    <TaskAltIcon
+                                      fontSize="small"
+                                    />
+                                  )
+                                }
+                                onClick={() =>
+                                  void handleCompleteProject(
+                                    selectedProject,
+                                  )
+                                }
+                                sx={{
+                                  borderRadius: 2,
+                                  textTransform:
+                                    "none",
+                                  fontWeight: 700,
+                                  whiteSpace:
+                                    "nowrap",
+                                }}
+                              >
+                                {completingProjectId ===
+                                selectedProject.id
+                                  ? "Completing..."
+                                  : "Mark Completed"}
+                              </Button>
+                            )}
+                          </Stack>
+                        </Stack>
+
+                        {projectProgress ===
+                        null ? (
+                          <Box
+                            sx={{
+                              minHeight:
+                                230,
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              justifyContent:
+                                "center",
+                              textAlign:
+                                "center",
+                              px: 3,
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                            >
+                              Timeline
+                              progress is
+                              unavailable
+                              because this
+                              project does
+                              not have both
+                              a start date
+                              and an end
+                              date.
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <>
+                            <ResponsiveContainer
+                              width="100%"
+                              height={
+                                220
+                              }
+                            >
+                              <BarChart
+                                data={[
+                                  {
+                                    name:
+                                      "Timeline",
+                                    progress:
+                                      projectProgress,
+                                  },
+                                ]}
+                                layout="vertical"
+                                margin={{
+                                  top: 20,
+                                  right:
+                                    30,
+                                  bottom:
+                                    20,
+                                  left: 10,
+                                }}
+                              >
+                                <CartesianGrid
+                                  horizontal={
+                                    false
+                                  }
+                                  stroke={alpha(
+                                    "#0B1120",
+                                    0.06,
+                                  )}
+                                />
+
+                                <XAxis
+                                  type="number"
+                                  domain={[
+                                    0,
+                                    100,
+                                  ]}
+                                  tickFormatter={(
+                                    value:
+                                      number,
+                                  ): string =>
+                                    `${value}%`
+                                  }
+                                  tickLine={
+                                    false
+                                  }
+                                  axisLine={
+                                    false
+                                  }
+                                  tick={{
+                                    fontSize:
+                                      12,
+                                    fill:
+                                      "#64748B",
+                                  }}
+                                />
+
+                                <YAxis
+                                  type="category"
+                                  dataKey="name"
+                                  tickLine={
+                                    false
+                                  }
+                                  axisLine={
+                                    false
+                                  }
+                                  width={
+                                    70
+                                  }
+                                  tick={{
+                                    fontSize:
+                                      12,
+                                    fill:
+                                      "#64748B",
+                                  }}
+                                />
+
+                                <ChartTooltip
+                                  formatter={(value) => [
+                                    `${Number(value ?? 0)}%`,
+                                    "Timeline progress",
+                                  ]}
+                                  contentStyle={{
+                                    borderRadius:
+                                      12,
+                                    border:
+                                      "1px solid #E2E8F0",
+                                    boxShadow:
+                                      "0 8px 24px rgba(15, 23, 42, 0.08)",
+                                  }}
+                                />
+
+                                <Bar
+                                  dataKey="progress"
+                                  fill={
+                                    ACCENT_VIOLET
+                                  }
+                                  radius={[
+                                    0,
+                                    8,
+                                    8,
+                                    0,
+                                  ]}
+                                  barSize={
+                                    42
+                                  }
+                                />
+                              </BarChart>
+                            </ResponsiveContainer>
+
+                            <Box
+                              sx={{
+                                p: 2,
+                                borderRadius:
+                                  2,
+                                bgcolor:
+                                  alpha(
+                                    ACCENT_VIOLET,
+                                    0.06,
+                                  ),
+                              }}
+                            >
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight:
+                                    700,
+                                  color:
+                                    "#0B1120",
+                                }}
+                              >
+                                {
+                                  projectProgress
+                                }
+                                % timeline
+                                progress
+                              </Typography>
+
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                Calculated
+                                from the
+                                project start
+                                and end dates.
+                                This is
+                                timeline
+                                progress, not
+                                task-completion
+                                progress.
+                              </Typography>
+                            </Box>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </Stack>
+                )}
+              </ChartCard>
+            </Grid>
+          </Grid>
+
+        </Stack>
+      </Container>
+    </Box>
+  );
+}
+
+interface DashboardHeaderProps {
+  fullName?: string;
+  loading: boolean;
+  onRefresh: () => void;
+}
+
+function DashboardHeader({
+  fullName,
+  loading,
+  onRefresh,
+}: DashboardHeaderProps):
+  React.ReactElement {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        position: "relative",
+        overflow: "hidden",
+        p: {
+          xs: 3,
+          md: 4,
+        },
+        borderRadius: 3,
+        background:
+          "linear-gradient(120deg, #0B1120 0%, #1E1B4B 55%, #4F46E5 100%)",
+        color: "common.white",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          backgroundImage:
+            "radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)",
+          backgroundSize:
+            "18px 18px",
+          opacity: 0.5,
+          pointerEvents:
+            "none",
+        },
+      }}
+    >
+      <Box
+        sx={{
+          position: "relative",
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent:
+              "space-between",
+            alignItems: {
+              xs: "flex-start",
+              sm: "center",
+            },
+            flexDirection: {
+              xs: "column",
+              sm: "row",
+            },
+            gap: 2,
+          }}
+        >
+          <Box>
+            <Typography
+              variant="overline"
+              sx={{
+                opacity: 0.75,
+                letterSpacing: 2,
+              }}
             >
               Employee Management
               System
-            </p>
+            </Typography>
 
-            <h1
-              style={
-                styles.heading
-              }
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 800,
+                mt: 0.5,
+              }}
             >
-              Welcome,{" "}
-              {currentUser.fullName}
-            </h1>
+              Employee Dashboard
+            </Typography>
 
-            <p
-              style={
-                styles.subtitle
-              }
+            <Typography
+              sx={{
+                mt: 1,
+                opacity: 0.85,
+                maxWidth: 640,
+              }}
             >
-              Manage your profile
-              and access the modules
-              assigned to you.
-            </p>
-          </div>
+              Welcome back,{" "}
+              {fullName ??
+                "Employee"}.
+              Track your leave requests
+              and assigned projects from
+              one place.
+            </Typography>
+          </Box>
 
-          <button
-            type="button"
-            onClick={
-              handleLogout
-            }
-            style={
-              styles.logoutButton
-            }
+          <Tooltip
+            title="Refresh dashboard"
           >
-            Sign Out
-          </button>
-        </header>
-
-        <section
-          style={
-            styles.summaryGrid
-          }
-        >
-          <article
-            style={
-              styles.summaryCard
-            }
-          >
-            <span
-              style={
-                styles.label
-              }
-            >
-              Email
+            <span>
+              <IconButton
+                disabled={loading}
+                onClick={onRefresh}
+                sx={{
+                  bgcolor:
+                    "rgba(255,255,255,0.12)",
+                  color:
+                    "common.white",
+                  "&:hover": {
+                    bgcolor:
+                      "rgba(255,255,255,0.20)",
+                  },
+                }}
+              >
+                {loading ? (
+                  <CircularProgress
+                    size={22}
+                    color="inherit"
+                  />
+                ) : (
+                  <RefreshIcon />
+                )}
+              </IconButton>
             </span>
-
-            <strong>
-              {currentUser.email}
-            </strong>
-          </article>
-
-          <article
-            style={
-              styles.summaryCard
-            }
-          >
-            <span
-              style={
-                styles.label
-              }
-            >
-              Role
-            </span>
-
-            <strong>
-              {currentUser.role}
-            </strong>
-          </article>
-
-          <article
-            style={
-              styles.summaryCard
-            }
-          >
-            <span
-              style={
-                styles.label
-              }
-            >
-              Department
-            </span>
-
-            <strong>
-              {profile
-                ?.departmentName ??
-                "Not assigned"}
-            </strong>
-          </article>
-
-          <article
-            style={
-              styles.summaryCard
-            }
-          >
-            <span
-              style={
-                styles.label
-              }
-            >
-              Permissions
-            </span>
-
-            <strong>
-              {
-                currentUser
-                  .permissions
-                  .length
-              }
-            </strong>
-          </article>
-        </section>
-
-        <section
-          style={
-            styles.card
-          }
-        >
-          <div
-            style={
-              styles.sectionHeader
-            }
-          >
-            <div>
-              <h2
-                style={
-                  styles.sectionHeading
-                }
-              >
-                My Modules
-              </h2>
-
-              <p
-                style={
-                  styles.sectionDescription
-                }
-              >
-                Only modules assigned
-                to your account are
-                available.
-              </p>
-            </div>
-          </div>
-
-          {visibleModules.length ===
-          0 ? (
-            <div
-              style={
-                styles.infoMessage
-              }
-            >
-              No additional modules
-              have been assigned to
-              your account.
-            </div>
-          ) : (
-            <div
-              style={
-                styles.moduleGrid
-              }
-            >
-              {visibleModules.map(
-                module => (
-                  <button
-                    key={
-                      module.permission
-                    }
-                    type="button"
-                    style={
-                      styles.moduleCard
-                    }
-                    onClick={() =>
-                      navigate(
-                        module.path,
-                      )
-                    }
-                  >
-                    <strong
-                      style={
-                        styles.moduleTitle
-                      }
-                    >
-                      {module.title}
-                    </strong>
-
-                    <span
-                      style={
-                        styles
-                          .moduleDescription
-                      }
-                    >
-                      {
-                        module.description
-                      }
-                    </span>
-
-                    <span
-                      style={
-                        styles.moduleAction
-                      }
-                    >
-                      Open module →
-                    </span>
-                  </button>
-                ),
-              )}
-            </div>
-          )}
-        </section>
-
-        {isLoading && (
-          <section
-            style={
-              styles.card
-            }
-          >
-            <p>
-              Loading your
-              employee profile...
-            </p>
-          </section>
-        )}
-
-        {!isLoading &&
-          !profile && (
-            <section
-              style={
-                styles.card
-              }
-            >
-              <div
-                style={
-                  styles.errorMessage
-                }
-              >
-                {error ||
-                  "No employee profile is linked to this account."}
-              </div>
-            </section>
-          )}
-
-        {!isLoading &&
-          profile && (
-            <section
-              style={
-                styles.card
-              }
-            >
-              <div
-                style={
-                  styles.sectionHeader
-                }
-              >
-                <div>
-                  <h2
-                    style={
-                      styles.sectionHeading
-                    }
-                  >
-                    My Details
-                  </h2>
-
-                  <p
-                    style={
-                      styles
-                        .sectionDescription
-                    }
-                  >
-                    Update your
-                    personal details.
-                    Email, role and
-                    department can
-                    only be changed
-                    by an administrator.
-                  </p>
-                </div>
-              </div>
-
-              {error && (
-                <div
-                  style={
-                    styles.errorMessage
-                  }
-                >
-                  {error}
-                </div>
-              )}
-
-              {success && (
-                <div
-                  style={
-                    styles.successMessage
-                  }
-                >
-                  {success}
-                </div>
-              )}
-
-              <form
-                onSubmit={
-                  handleSubmit
-                }
-              >
-                <div
-                  style={
-                    styles.formGrid
-                  }
-                >
-                  <FormField
-                    label="First name"
-                    name="firstName"
-                    value={
-                      form.firstName
-                    }
-                    onChange={
-                      handleInputChange
-                    }
-                    disabled={
-                      isSaving
-                    }
-                    required
-                  />
-
-                  <FormField
-                    label="Last name"
-                    name="lastName"
-                    value={
-                      form.lastName
-                    }
-                    onChange={
-                      handleInputChange
-                    }
-                    disabled={
-                      isSaving
-                    }
-                    required
-                  />
-
-                  <FormField
-                    label="Email"
-                    name="email"
-                    value={
-                      profile.email
-                    }
-                    disabled
-                  />
-
-                  <FormField
-                    label="Department"
-                    name="department"
-                    value={
-                      profile
-                        .departmentName ??
-                      "Not assigned"
-                    }
-                    disabled
-                  />
-
-                  <FormField
-                    label="Street"
-                    name="street"
-                    value={
-                      form.street
-                    }
-                    onChange={
-                      handleInputChange
-                    }
-                    disabled={
-                      isSaving
-                    }
-                  />
-
-                  <FormField
-                    label="City"
-                    name="city"
-                    value={
-                      form.city
-                    }
-                    onChange={
-                      handleInputChange
-                    }
-                    disabled={
-                      isSaving
-                    }
-                  />
-
-                  <FormField
-                    label="Country"
-                    name="country"
-                    value={
-                      form.country
-                    }
-                    onChange={
-                      handleInputChange
-                    }
-                    disabled={
-                      isSaving
-                    }
-                  />
-
-                  <FormField
-                    label="Postal code"
-                    name="postalCode"
-                    value={
-                      form.postalCode
-                    }
-                    onChange={
-                      handleInputChange
-                    }
-                    disabled={
-                      isSaving
-                    }
-                  />
-                </div>
-
-                <div
-                  style={
-                    styles.actions
-                  }
-                >
-                  <button
-                    type="button"
-                    onClick={
-                      handleReset
-                    }
-                    disabled={
-                      isSaving ||
-                      !profileHasChanged
-                    }
-                    style={{
-                      ...styles
-                        .resetButton,
-
-                      opacity:
-                        isSaving ||
-                        !profileHasChanged
-                          ? 0.6
-                          : 1,
-                    }}
-                  >
-                    Cancel changes
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={
-                      isSaving ||
-                      !profileHasChanged
-                    }
-                    style={{
-                      ...styles
-                        .saveButton,
-
-                      opacity:
-                        isSaving ||
-                        !profileHasChanged
-                          ? 0.6
-                          : 1,
-                    }}
-                  >
-                    {isSaving
-                      ? "Saving..."
-                      : "Save changes"}
-                  </button>
-                </div>
-              </form>
-            </section>
-          )}
-      </div>
-    </main>
+          </Tooltip>
+        </Box>
+      </Box>
+    </Paper>
   );
 }
 
-function FormField({
-  label,
-  name,
-  value,
-  disabled = false,
-  required = false,
-  onChange,
-}: FormFieldProps):
-  React.ReactElement {
+function SectionHeading({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}): React.ReactElement {
   return (
-    <label
-      style={
-        styles.field
-      }
-    >
-      <span
-        style={
-          styles.label
-        }
-      >
-        {label}
-      </span>
-
-      <input
-        type="text"
-        name={
-          name
-        }
-        value={
-          value
-        }
-        onChange={
-          onChange
-        }
-        disabled={
-          disabled
-        }
-        required={
-          required
-        }
-        style={{
-          ...styles.input,
-
-          background:
-            disabled
-              ? "#f1f3f5"
-              : "#ffffff",
-
-          cursor:
-            disabled
-              ? "not-allowed"
-              : "text",
+    <Box>
+      <Typography
+        variant="h5"
+        sx={{
+          fontWeight: 700,
+          color: "#0B1120",
         }}
-      />
-    </label>
+      >
+        {title}
+      </Typography>
+
+      <Typography
+        color="text.secondary"
+        sx={{
+          mt: 0.5,
+        }}
+      >
+        {subtitle}
+      </Typography>
+    </Box>
   );
 }
 
-function createFormFromProfile(
-  employeeProfile:
-    EmployeeProfile,
-): ProfileForm {
-  return {
-    firstName:
-      employeeProfile
-        .firstName ?? "",
-
-    lastName:
-      employeeProfile
-        .lastName ?? "",
-
-    street:
-      employeeProfile
-        .street ?? "",
-
-    city:
-      employeeProfile
-        .city ?? "",
-
-    country:
-      employeeProfile
-        .country ?? "",
-
-    postalCode:
-      employeeProfile
-        .postalCode ?? "",
-  };
-}
-
-function normalizeProfileForm(
-  profileForm:
-    ProfileForm,
-): ProfileForm {
-  return {
-    firstName:
-      profileForm
-        .firstName
-        .trim(),
-
-    lastName:
-      profileForm
-        .lastName
-        .trim(),
-
-    street:
-      profileForm
-        .street
-        .trim(),
-
-    city:
-      profileForm
-        .city
-        .trim(),
-
-    country:
-      profileForm
-        .country
-        .trim(),
-
-    postalCode:
-      profileForm
-        .postalCode
-        .trim(),
-  };
-}
-
-function hasProfileChanged(
-  currentForm:
-    ProfileForm,
-
-  savedForm:
-    ProfileForm,
-): boolean {
-  const current =
-    normalizeProfileForm(
-      currentForm,
-    );
-
-  const saved =
-    normalizeProfileForm(
-      savedForm,
-    );
-
+function ChartCard({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  children: ReactNode;
+}): React.ReactElement {
   return (
-    current.firstName !==
-      saved.firstName ||
+    <Card
+      sx={{
+        height: "100%",
+        borderRadius: 3,
+        border: 1,
+        borderColor:
+          "divider",
+        boxShadow: "none",
+      }}
+    >
+      <CardContent
+        sx={{
+          p: 3,
+        }}
+      >
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            mb: 2,
+            alignItems: "center",
+          }}
+        >
+          <Box
+            sx={{
+              color:
+                ACCENT_INDIGO,
+              display: "flex",
+            }}
+          >
+            {icon}
+          </Box>
 
-    current.lastName !==
-      saved.lastName ||
+          <Typography
+            variant="subtitle1"
+            sx={{
+              fontWeight: 700,
+            }}
+          >
+            {title}
+          </Typography>
+        </Stack>
 
-    current.street !==
-      saved.street ||
-
-    current.city !==
-      saved.city ||
-
-    current.country !==
-      saved.country ||
-
-    current.postalCode !==
-      saved.postalCode
+        {children}
+      </CardContent>
+    </Card>
   );
 }
 
-async function readResponseBody(
-  response:
-    Response,
-): Promise<unknown> {
-  if (
-    response.status ===
-    204
-  ) {
-    return {};
-  }
-
-  const contentType =
-    response.headers.get(
-      "content-type",
-    );
-
-  if (
-    contentType?.includes(
-      "application/json",
-    )
-  ) {
-    return response.json();
-  }
-
-  const text =
-    await response.text();
-
-  return text
-    ? {
-        message:
-          text,
-      }
-    : {};
+function EmptyChartState({
+  message,
+}: {
+  message: string;
+}): React.ReactElement {
+  return (
+    <Box
+      sx={{
+        height: 280,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        color: "text.secondary",
+        px: 4,
+      }}
+    >
+      <Typography
+        variant="body2"
+      >
+        {message}
+      </Typography>
+    </Box>
+  );
 }
 
-function getErrorMessage(
-  responseBody:
-    unknown,
+function isProjectCompleted(
+  project: Project,
+): boolean {
+  const record =
+    project as Project &
+      Record<string, unknown>;
 
-  fallbackMessage:
-    string,
+  const status: unknown =
+    record["status"];
+
+  if (
+    typeof status === "string"
+  ) {
+    return (
+      status
+        .trim()
+        .toLowerCase() ===
+      "completed"
+    );
+  }
+
+  return false;
+}
+
+function calculateProjectTimelineProgress(
+  project: Project,
+): number | null {
+  if (
+    isProjectCompleted(project)
+  ) {
+    return 100;
+  }
+
+  const startDateValue:
+    string | undefined =
+    project.startDate;
+
+  const endDateValue:
+    string | null | undefined =
+    project.endDate;
+
+  if (
+    !startDateValue ||
+    !endDateValue
+  ) {
+    return null;
+  }
+
+  const startDate: Date =
+    new Date(startDateValue);
+
+  const endDate: Date =
+    new Date(endDateValue);
+
+  const now: Date =
+    new Date();
+
+  const start:
+    number =
+    startDate.getTime();
+
+  const end:
+    number =
+    endDate.getTime();
+
+  const current:
+    number =
+    now.getTime();
+
+  if (
+    Number.isNaN(start) ||
+    Number.isNaN(end) ||
+    end <= start
+  ) {
+    return null;
+  }
+
+  const progress:
+    number =
+    ((current - start) /
+      (end - start)) *
+    100;
+
+  return Math.round(
+    Math.min(
+      100,
+      Math.max(
+        0,
+        progress,
+      ),
+    ),
+  );
+}
+
+function formatProjectPeriod(
+  project: Project,
 ): string {
-  if (
-    typeof responseBody !==
-      "object" ||
-    responseBody ===
-      null
-  ) {
-    return fallbackMessage;
-  }
+  const start:
+    string =
+    project.startDate
+      ? formatDate(
+          project.startDate,
+        )
+      : "No start date";
 
-  const apiError =
-    responseBody as ApiError;
+  const end:
+    string =
+    project.endDate
+      ? formatDate(
+          project.endDate,
+        )
+      : "No end date";
 
-  if (
-    typeof apiError.message ===
-      "string" &&
-    apiError.message.trim()
-  ) {
-    return apiError.message;
-  }
+  return `${start} – ${end}`;
+}
 
-  if (
-    Array.isArray(
-      apiError.errors,
-    ) &&
-    apiError.errors.length >
-      0
-  ) {
-    return apiError.errors.join(
-      " ",
-    );
-  }
+function formatDate(
+  value: string,
+): string {
+  const date: Date =
+    new Date(value);
 
   if (
-    apiError.errors &&
-    !Array.isArray(
-      apiError.errors,
+    Number.isNaN(
+      date.getTime(),
     )
   ) {
-    const validationMessages =
-      Object.values(
-        apiError.errors,
-      ).flat();
-
-    if (
-      validationMessages.length >
-      0
-    ) {
-      return validationMessages.join(
-        " ",
-      );
-    }
+    return value;
   }
 
-  if (
-    typeof apiError.title ===
-      "string" &&
-    apiError.title.trim()
-  ) {
-    return apiError.title;
-  }
-
-  return fallbackMessage;
-}
-
-function clearAuthentication():
-  void {
-  localStorage.removeItem(
-    TOKEN_KEY,
-  );
-
-  localStorage.removeItem(
-    USER_KEY,
+  return date.toLocaleDateString(
+    undefined,
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    },
   );
 }
 
-const styles:
-  Record<
-    string,
-    CSSProperties
-  > = {
-  page: {
-    minHeight:
-      "100vh",
-
-    background:
-      "#f4f6f8",
-
-    padding:
-      "40px 20px",
-  },
-
-  dashboard: {
-    width:
-      "100%",
-
-    maxWidth:
-      1100,
-
-    margin:
-      "0 auto",
-  },
-
-  header: {
-    display:
-      "flex",
-
-    justifyContent:
-      "space-between",
-
-    alignItems:
-      "flex-start",
-
-    gap:
-      20,
-
-    marginBottom:
-      24,
-  },
-
-  eyebrow: {
-    color:
-      "#667085",
-
-    fontSize:
-      14,
-
-    margin:
-      "0 0 8px",
-  },
-
-  heading: {
-    margin:
-      "0 0 8px",
-
-    color:
-      "#101828",
-  },
-
-  subtitle: {
-    margin:
-      0,
-
-    color:
-      "#667085",
-  },
-
-  logoutButton: {
-    border:
-      "1px solid #d0d5dd",
-
-    borderRadius:
-      8,
-
-    background:
-      "#ffffff",
-
-    padding:
-      "10px 18px",
-
-    cursor:
-      "pointer",
-  },
-
-  summaryGrid: {
-    display:
-      "grid",
-
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(200px, 1fr))",
-
-    gap:
-      16,
-
-    marginBottom:
-      24,
-  },
-
-  summaryCard: {
-    background:
-      "#ffffff",
-
-    borderRadius:
-      10,
-
-    padding:
-      20,
-
-    boxShadow:
-      "0 1px 4px rgba(16,24,40,0.08)",
-
-    display:
-      "flex",
-
-    flexDirection:
-      "column",
-
-    gap:
-      8,
-  },
-
-  card: {
-    background:
-      "#ffffff",
-
-    borderRadius:
-      12,
-
-    padding:
-      28,
-
-    boxShadow:
-      "0 2px 10px rgba(16,24,40,0.08)",
-
-    marginBottom:
-      24,
-  },
-
-  moduleGrid: {
-    display:
-      "grid",
-
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(220px, 1fr))",
-
-    gap:
-      16,
-  },
-
-  moduleCard: {
-    display:
-      "flex",
-
-    flexDirection:
-      "column",
-
-    alignItems:
-      "flex-start",
-
-    textAlign:
-      "left",
-
-    gap:
-      10,
-
-    background:
-      "#ffffff",
-
-    border:
-      "1px solid #e4e7ec",
-
-    borderRadius:
-      10,
-
-    padding:
-      20,
-
-    cursor:
-      "pointer",
-  },
-
-  moduleTitle: {
-    color:
-      "#101828",
-
-    fontSize:
-      17,
-  },
-
-  moduleDescription: {
-    color:
-      "#667085",
-
-    fontSize:
-      14,
-
-    lineHeight:
-      1.5,
-  },
-
-  moduleAction: {
-    color:
-      "#2563eb",
-
-    fontWeight:
-      600,
-
-    fontSize:
-      14,
-  },
-
-  infoMessage: {
-    background:
-      "#f2f4f7",
-
-    color:
-      "#475467",
-
-    borderRadius:
-      8,
-
-    padding:
-      14,
-  },
-
-  sectionHeader: {
-    display:
-      "flex",
-
-    justifyContent:
-      "space-between",
-
-    marginBottom:
-      24,
-  },
-
-  sectionHeading: {
-    margin:
-      "0 0 6px",
-
-    color:
-      "#101828",
-  },
-
-  sectionDescription: {
-    margin:
-      0,
-
-    color:
-      "#667085",
-  },
-
-  formGrid: {
-    display:
-      "grid",
-
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(250px, 1fr))",
-
-    gap:
-      20,
-  },
-
-  field: {
-    display:
-      "flex",
-
-    flexDirection:
-      "column",
-
-    gap:
-      8,
-  },
-
-  label: {
-    color:
-      "#475467",
-
-    fontSize:
-      14,
-
-    fontWeight:
-      500,
-  },
-
-  input: {
-    width:
-      "100%",
-
-    boxSizing:
-      "border-box",
-
-    border:
-      "1px solid #d0d5dd",
-
-    borderRadius:
-      8,
-
-    padding:
-      "11px 12px",
-
-    fontSize:
-      15,
-  },
-
-  actions: {
-    display:
-      "flex",
-
-    justifyContent:
-      "flex-end",
-
-    gap:
-      12,
-
-    marginTop:
-      24,
-  },
-
-  resetButton: {
-    border:
-      "1px solid #d0d5dd",
-
-    borderRadius:
-      8,
-
-    background:
-      "#ffffff",
-
-    color:
-      "#344054",
-
-    padding:
-      "11px 22px",
-
-    fontSize:
-      15,
-
-    fontWeight:
-      600,
-  },
-
-  saveButton: {
-    border:
-      0,
-
-    borderRadius:
-      8,
-
-    background:
-      "#2563eb",
-
-    color:
-      "#ffffff",
-
-    padding:
-      "11px 22px",
-
-    fontSize:
-      15,
-
-    fontWeight:
-      600,
-  },
-
-  errorMessage: {
-    background:
-      "#fef3f2",
-
-    color:
-      "#b42318",
-
-    border:
-      "1px solid #fecdca",
-
-    borderRadius:
-      8,
-
-    padding:
-      12,
-
-    marginBottom:
-      20,
-  },
-
-  successMessage: {
-    background:
-      "#ecfdf3",
-
-    color:
-      "#027a48",
-
-    border:
-      "1px solid #abefc6",
-
-    borderRadius:
-      8,
-
-    padding:
-      12,
-
-    marginBottom:
-      20,
-  },
-};
+function getStoredUser():
+  StoredUser | null {
+  const storedUserJson:
+    string | null =
+    localStorage.getItem(
+      "authUser",
+    );
+
+  if (!storedUserJson) {
+    return null;
+  }
+
+  try {
+    const user:
+      StoredUser =
+      JSON.parse(
+        storedUserJson,
+      ) as StoredUser;
+
+    return user.role ===
+      "Employee"
+      ? user
+      : null;
+  } catch {
+    return null;
+  }
+}

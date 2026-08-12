@@ -16,7 +16,6 @@ import WorkIcon from "@mui/icons-material/Work";
 
 import {
   Alert,
-  Autocomplete,
   Avatar,
   Box,
   Button,
@@ -27,9 +26,9 @@ import {
   Grid,
   IconButton,
   Paper,
+  Pagination,
   Skeleton,
   Stack,
-  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -73,12 +72,6 @@ interface CategoryConfig {
   icon: ReactNode;
 }
 
-type InsightFilter = "all" | keyof DashboardStatistics;
-
-interface InsightOption {
-  key: InsightFilter;
-  label: string;
-}
 
 // One accent color per record type. Reused across the stat cards,
 // the header KPI strip, and both charts so everything reads as one system.
@@ -89,13 +82,6 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
   { key: "pendingLeaves", label: "Pending Leaves", color: "#D97706", icon: <EventAvailableIcon /> },
 ];
 
-const INSIGHT_OPTIONS: InsightOption[] = [
-  { key: "all", label: "All" },
-  ...CATEGORY_CONFIG.map((category: CategoryConfig) => ({
-    key: category.key,
-    label: category.label,
-  })),
-];
 
 interface SummaryCardProps {
   title: string;
@@ -119,10 +105,10 @@ export default function SuperAdminDashboardPage(): React.ReactElement {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
-  const [insightFilter, setInsightFilter] = useState<InsightFilter>("all");
   const [pendingLeaveItems, setPendingLeaveItems] = useState<
     Record<string, unknown>[]
   >([]);
+  const [pendingLeavePage, setPendingLeavePage] = useState<number>(1);
   const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
   const [leaveActionError, setLeaveActionError] = useState<string>("");
 
@@ -220,25 +206,28 @@ export default function SuperAdminDashboardPage(): React.ReactElement {
   );
 
   const totalRecords: number =
-    statistics.employees + statistics.departments + statistics.projects + statistics.pendingLeaves;
+    statistics.employees +
+    statistics.departments +
+    statistics.projects +
+    statistics.pendingLeaves;
 
-  const selectedInsightOption: InsightOption =
-    INSIGHT_OPTIONS.find(
-      (option: InsightOption): boolean => option.key === insightFilter,
-    ) ?? INSIGHT_OPTIONS[0];
+  const PENDING_LEAVES_PER_PAGE = 5;
+  const pendingLeavePageCount: number = Math.max(
+    1,
+    Math.ceil(pendingLeaveItems.length / PENDING_LEAVES_PER_PAGE),
+  );
 
-  const insightChartData =
-    insightFilter === "all"
-      ? chartData
-      : chartData.filter(
-          (_entry, index: number): boolean =>
-            CATEGORY_CONFIG[index]?.key === insightFilter,
-        );
+  const paginatedPendingLeaves: Record<string, unknown>[] =
+    pendingLeaveItems.slice(
+      (pendingLeavePage - 1) * PENDING_LEAVES_PER_PAGE,
+      pendingLeavePage * PENDING_LEAVES_PER_PAGE,
+    );
 
-  const insightTotalRecords: number =
-    insightFilter === "all"
-      ? totalRecords
-      : statistics[insightFilter];
+  useEffect(() => {
+    if (pendingLeavePage > pendingLeavePageCount) {
+      setPendingLeavePage(pendingLeavePageCount);
+    }
+  }, [pendingLeavePage, pendingLeavePageCount]);
 
   return (
     <Box sx={{ bgcolor: "#F5F7FB", minHeight: "100%" }}>
@@ -272,51 +261,21 @@ export default function SuperAdminDashboardPage(): React.ReactElement {
             ))}
           </Grid>
 
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: { xs: "stretch", sm: "center" },
-              justifyContent: "space-between",
-              flexDirection: { xs: "column", sm: "row" },
-              gap: 2,
-            }}
-          >
-            <SectionHeading title="Insights" subtitle="How records break down across the system." />
-
-            <Autocomplete
-              size="small"
-              disableClearable
-              options={INSIGHT_OPTIONS}
-              value={selectedInsightOption}
-              getOptionLabel={(option: InsightOption): string => option.label}
-              isOptionEqualToValue={(
-                option: InsightOption,
-                value: InsightOption,
-              ): boolean => option.key === value.key}
-              onChange={(_event, value: InsightOption): void => {
-                setInsightFilter(value.key);
-              }}
-              sx={{ width: { xs: "100%", sm: 260 } }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Search insights"
-                  placeholder="Select module"
-                />
-              )}
-            />
-          </Box>
+          <SectionHeading
+            title="Insights"
+            subtitle="How records break down across the system."
+          />
 
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, lg: 7 }}>
               <ChartCard title="Records by category" icon={<InsightsIcon fontSize="small" />}>
                 {loading ? (
                   <Skeleton variant="rounded" height={280} />
-                ) : insightTotalRecords === 0 ? (
+                ) : totalRecords === 0 ? (
                   <EmptyChartState message="No records yet. Data will appear here once employees, departments, projects or leave requests are added." />
                 ) : (
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={insightChartData} barSize={40}>
+                    <BarChart data={chartData} barSize={40}>
                       <CartesianGrid vertical={false} stroke={alpha("#0B1120", 0.06)} />
                       <XAxis
                         dataKey="name"
@@ -340,7 +299,7 @@ export default function SuperAdminDashboardPage(): React.ReactElement {
                         }}
                       />
                       <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                        {insightChartData.map((entry) => (
+                        {chartData.map((entry) => (
                           <Cell key={entry.name} fill={entry.color} />
                         ))}
                       </Bar>
@@ -354,14 +313,14 @@ export default function SuperAdminDashboardPage(): React.ReactElement {
               <ChartCard title="Share of total" icon={<InsightsIcon fontSize="small" />}>
                 {loading ? (
                   <Skeleton variant="rounded" height={280} />
-                ) : insightTotalRecords === 0 ? (
+                ) : totalRecords === 0 ? (
                   <EmptyChartState message="Nothing to show yet." />
                 ) : (
                   <Box sx={{ position: "relative" }}>
                     <ResponsiveContainer width="100%" height={280}>
                       <PieChart>
                         <Pie
-                          data={insightChartData}
+                          data={chartData}
                           dataKey="value"
                           nameKey="name"
                           innerRadius={70}
@@ -369,7 +328,7 @@ export default function SuperAdminDashboardPage(): React.ReactElement {
                           paddingAngle={3}
                           stroke="none"
                         >
-                          {insightChartData.map((entry) => (
+                          {chartData.map((entry) => (
                             <Cell key={entry.name} fill={entry.color} />
                           ))}
                         </Pie>
@@ -394,7 +353,7 @@ export default function SuperAdminDashboardPage(): React.ReactElement {
                       }}
                     >
                       <Typography variant="h4" sx={{ fontWeight: 800, color: "#0B1120" }}>
-                        {insightTotalRecords}
+                        {totalRecords}
                       </Typography>
                       <Typography variant="caption" sx={{ color: "#64748B" }}>
                         total records
@@ -411,10 +370,7 @@ export default function SuperAdminDashboardPage(): React.ReactElement {
                     alignItems: "center",
                   }}
                 >
-                  {CATEGORY_CONFIG.filter(
-                    (category: CategoryConfig): boolean =>
-                      insightFilter === "all" || category.key === insightFilter,
-                  ).map((category) => (
+                  {CATEGORY_CONFIG.map((category: CategoryConfig) => (
                     <Stack
                       key={category.key}
                       direction="row"
@@ -500,7 +456,7 @@ export default function SuperAdminDashboardPage(): React.ReactElement {
               </Box>
             ) : (
               <Stack divider={<Box sx={{ borderTop: "1px solid #E2E8F0" }} />}>
-                {pendingLeaveItems.slice(0, 5).map(
+                {paginatedPendingLeaves.map(
                   (leave: Record<string, unknown>, index: number) => (
                     <Box
                       key={getLeaveKey(leave, index)}
@@ -608,6 +564,31 @@ export default function SuperAdminDashboardPage(): React.ReactElement {
                   ),
                 )}
               </Stack>
+            )}
+
+            {!loading && pendingLeaveItems.length > PENDING_LEAVES_PER_PAGE && (
+              <Box
+                sx={{
+                  px: { xs: 2, sm: 3 },
+                  py: 2,
+                  display: "flex",
+                  justifyContent: "center",
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <Pagination
+                  count={pendingLeavePageCount}
+                  page={pendingLeavePage}
+                  onChange={(_event, page: number): void =>
+                    setPendingLeavePage(page)
+                  }
+                  color="primary"
+                  shape="rounded"
+                  showFirstButton
+                  showLastButton
+                />
+              </Box>
             )}
           </Card>
         </Stack>

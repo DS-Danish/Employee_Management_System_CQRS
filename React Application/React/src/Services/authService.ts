@@ -5,6 +5,7 @@ import type {
   LoginResponse,
   RegisterRequest,
   RegisterResponse,
+  SystemUser,
 } from "../Types/auth";
 
 const configuredBaseUrl: string =
@@ -36,14 +37,6 @@ async function readErrorMessage(
         responseText,
       ) as ApiErrorResponse;
 
-    /*
-     * Custom API error format:
-     *
-     * errors: [
-     *   "Error one",
-     *   "Error two"
-     * ]
-     */
     if (
       Array.isArray(
         error.errors,
@@ -59,18 +52,6 @@ async function readErrorMessage(
       }
     }
 
-    /*
-     * ASP.NET validation format:
-     *
-     * errors: {
-     *   Email: [
-     *     "Email is required."
-     *   ],
-     *   Password: [
-     *     "Password is required."
-     *   ]
-     * }
-     */
     if (
       error.errors &&
       !Array.isArray(
@@ -195,6 +176,38 @@ export async function getAvailableEmployees():
   return (
     await response.json()
   ) as AvailableEmployee[];
+}
+
+export async function getSystemUsers():
+  Promise<SystemUser[]> {
+  const token: string =
+    getAuthenticationToken();
+
+  const response: Response =
+    await fetch(
+      `${apiBaseUrl}/api/auth/users`,
+      {
+        method:
+          "GET",
+
+        headers: {
+          Authorization:
+            `Bearer ${token}`,
+        },
+      },
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(
+        response,
+      ),
+    );
+  }
+
+  return (
+    await response.json()
+  ) as SystemUser[];
 }
 
 export async function loginUser(

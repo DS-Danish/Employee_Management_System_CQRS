@@ -10,7 +10,6 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import GroupsIcon from "@mui/icons-material/Groups";
-import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
@@ -40,7 +39,6 @@ import {
 } from "@mui/material";
 
 import { CreateEmployeeModal } from "../Components/CreateEmployeeModal";
-import { CreateUserModal } from "../Components/CreateUserModal";
 import { EditEmployeeModal } from "../Components/EditEmployeeModal";
 import { EmployeeTable } from "../Components/EmployeeTable";
 
@@ -57,8 +55,6 @@ import { getProjects } from "../services/projectService";
 
 import type { Department } from "../Types/department";
 
-import type { StoredUser } from "../Types/auth";
-
 import type {
   Employee,
   EmployeeDetail,
@@ -70,12 +66,7 @@ import type {
 } from "../Types/project";
 
 
-export function EmployeesPage() {
-  const currentUser: StoredUser | null =
-    getStoredUser();
-
-  const isSuperAdmin: boolean =
-    currentUser?.role === "SuperAdmin";
+export function EmployeesPage(): React.ReactElement {
 
   const [employees, setEmployees] =
     useState<Employee[]>([]);
@@ -90,9 +81,6 @@ export function EmployeesPage() {
     useState<boolean>(true);
 
   const [createModalOpen, setCreateModalOpen] =
-    useState<boolean>(false);
-
-  const [createUserModalOpen, setCreateUserModalOpen] =
     useState<boolean>(false);
 
   const [editModalOpen, setEditModalOpen] =
@@ -349,130 +337,77 @@ export function EmployeesPage() {
     );
 
   return (
-    <Box sx={{ bgcolor: "#F5F7FB", minHeight: "100%", py: { xs: 2, md: 3 } }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
+    <Box sx={{ bgcolor: "#F8FAFC", minHeight: "100%" }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}>
         <Stack spacing={3}>
           <Paper
             elevation={0}
             sx={{
-              p: { xs: 2.5, sm: 3.5 },
-              borderRadius: 4,
-              border: "1px solid",
-              borderColor: "divider",
-              background:
-                "linear-gradient(135deg, #FFFFFF 0%, #F7F8FF 55%, #EEF2FF 100%)",
-              boxShadow: "0 10px 30px rgba(15, 23, 42, 0.06)",
-              overflow: "hidden",
-              position: "relative",
-              "&::after": {
-                content: '""',
-                position: "absolute",
-                width: 180,
-                height: 180,
-                borderRadius: "50%",
-                right: -70,
-                top: -90,
-                background: "rgba(79, 70, 229, 0.08)",
-              },
+              p: { xs: 3, md: 4 },
+              borderRadius: 3,
+              background: "linear-gradient(135deg, #1976d2 0%, #512da8 100%)",
+              color: "common.white",
             }}
           >
             <Box
               sx={{
-                alignItems: {
-                  xs: "stretch",
-                  sm: "center",
-                },
                 display: "flex",
-                flexDirection: {
-                  xs: "column",
-                  sm: "row",
-                },
                 justifyContent: "space-between",
+                alignItems: { xs: "stretch", sm: "center" },
+                flexDirection: { xs: "column", sm: "row" },
                 gap: 2,
               }}
             >
               <Box>
-
                 <Typography
-                  component="h1"
-                  variant="h4"
-                  sx={{
-                    fontWeight: 800,
-                    letterSpacing: -0.8,
-                    color: "#0F172A",
-                  }}
+                  variant="overline"
+                  sx={{ opacity: 0.8, letterSpacing: 1.5 }}
                 >
-                  Employees
+                  Employee Management
                 </Typography>
 
-                <Typography
-                  color="text.secondary"
-                  sx={{ mt: 0.5 }}
-                >
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  Manage Employees
+                </Typography>
+
+                <Typography sx={{ mt: 1, opacity: 0.9 }}>
                   View, add, edit and manage employee information.
                 </Typography>
               </Box>
 
-              <Stack direction="row" spacing={1} sx={{ position: "relative", zIndex: 1, flexWrap: "wrap" }}>
-                <Tooltip title="Refresh">
-                  <span>
-                    <IconButton
-                      aria-label="Refresh employees"
-                      disabled={loading}
-                      onClick={() => void loadData()}
-                      sx={{
-                        border: "1px solid",
-                        borderColor: "divider",
-                        bgcolor: "background.paper",
-                        borderRadius: 2,
-                        boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
-                        "&:hover": {
-                          bgcolor: "#F8FAFC",
-                        },
-                      }}
-                    >
-                      <RefreshIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                {isSuperAdmin && (
-                  <Button
-                    type="button"
-                    variant="outlined"
-                    startIcon={<ManageAccountsIcon />}
-                    onClick={() => setCreateUserModalOpen(true)}
-                    sx={{
-                      borderRadius: 2.5,
-                      px: 2.5,
-                      py: 1.05,
-                      fontWeight: 700,
-                      textTransform: "none",
-                      bgcolor: "background.paper",
-                    }}
-                  >
-                    Create User
-                  </Button>
-                )}
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  disabled={loading}
+                  onClick={() => void loadData()}
+                  sx={{
+                    color: "common.white",
+                    borderColor: "rgba(255,255,255,0.6)",
+                    "&:hover": {
+                      borderColor: "common.white",
+                      bgcolor: "rgba(255,255,255,0.08)",
+                    },
+                  }}
+                >
+                  Refresh
+                </Button>
 
                 <Button
-                    type="button"
-                    variant="contained"
-                    disableElevation
-                    startIcon={<AddIcon />}
-                    onClick={() =>
-                      setCreateModalOpen(true)
-                    }
-                    sx={{
-                      borderRadius: 2.5,
-                      px: 2.75,
-                      py: 1.05,
-                      fontWeight: 700,
-                      textTransform: "none",
-                      boxShadow: "0 6px 16px rgba(79, 70, 229, 0.22)",
-                    }}
-                  >
-                    Add employee
-                  </Button>
+                  type="button"
+                  variant="contained"
+                  disableElevation
+                  startIcon={<AddIcon />}
+                  onClick={() => setCreateModalOpen(true)}
+                  sx={{
+                    bgcolor: "common.white",
+                    color: "primary.main",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.92)" },
+                  }}
+                >
+                  Add Employee
+                </Button>
               </Stack>
             </Box>
           </Paper>
@@ -566,12 +501,12 @@ export function EmployeesPage() {
                 }}
               >
                 <Box>
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 800, color: "#0F172A" }}
-                  >
-                    All Employees
-                  </Typography>
+                <Typography
+                  variant="h6"
+                  sx={{ fontWeight: 800, color: "#0F172A" }}
+                >
+                  All Employees
+                </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Employee information currently available in the system.
                   </Typography>
@@ -741,12 +676,6 @@ export function EmployeesPage() {
             </Button>
           </DialogActions>
           </Dialog>
-        {isSuperAdmin && (
-          <CreateUserModal
-            open={createUserModalOpen}
-            onClose={() => setCreateUserModalOpen(false)}
-          />
-        )}
 
         <CreateEmployeeModal
               open={createModalOpen}
@@ -788,22 +717,4 @@ export function EmployeesPage() {
       </Container>
     </Box>
   );
-}
-
-function getStoredUser():
-  StoredUser | null {
-  const storedUserJson: string | null =
-    localStorage.getItem("authUser");
-
-  if (!storedUserJson) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(
-      storedUserJson,
-    ) as StoredUser;
-  } catch {
-    return null;
-  }
 }

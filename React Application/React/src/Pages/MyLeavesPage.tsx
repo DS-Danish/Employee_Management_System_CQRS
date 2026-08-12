@@ -936,11 +936,6 @@ function BalanceCard({
                 mt: 1,
               }}
             >
-              Approved:{" "}
-              {balance.approvedDays}
-              {" · "}
-              Pending:{" "}
-              {balance.pendingDays}
             </Typography>
           </>
         ) : (
@@ -971,41 +966,6 @@ function BalanceCard({
                 mt: 2,
               }}
             >
-              <Typography
-                variant="body2"
-              >
-                Allocated:{" "}
-                {
-                  balance.allocatedDays
-                }
-              </Typography>
-
-              <Typography
-                variant="body2"
-              >
-                Approved:{" "}
-                {
-                  balance.approvedDays
-                }
-              </Typography>
-
-              <Typography
-                variant="body2"
-              >
-                Pending:{" "}
-                {
-                  balance.pendingDays
-                }
-              </Typography>
-
-              <Typography
-                variant="body2"
-              >
-                Remaining:{" "}
-                {
-                  balance.remainingDays
-                }
-              </Typography>
             </Stack>
           </>
         )}

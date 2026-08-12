@@ -1,12 +1,25 @@
-import { apiRequest } from "./apiClient";
+import {
+  apiRequest,
+} from "./apiClient";
 
-import type { EmployeeProject } from "../Types/project";
+import type {
+  EmployeeProject,
+  ProjectEmployee,
+} from "../Types/project";
 
 export function getEmployeeProjects(
   employeeId: string,
 ): Promise<EmployeeProject[]> {
   return apiRequest<EmployeeProject[]>(
     `/employees/${employeeId}/projects`,
+  );
+}
+
+export function getProjectEmployees(
+  projectId: string,
+): Promise<ProjectEmployee[]> {
+  return apiRequest<ProjectEmployee[]>(
+    `/projects/${projectId}/employees`,
   );
 }
 

@@ -17,3 +17,9 @@ export interface EmployeeProject {
   projectId: string;
   projectName?: string;
 }
+
+export interface ProjectEmployee {
+  employeeId: string;
+  fullName: string;
+  email: string;
+}

@@ -26,13 +26,11 @@ import {
   CircularProgress,
   Container,
   Divider,
-  IconButton,
   Paper,
   Skeleton,
   Snackbar,
   Stack,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
 
@@ -429,55 +427,70 @@ export default function EmployeeProfilePage():
       }}
     >
       <Container
-        maxWidth="lg"
-        sx={{ py: 5 }}
+        maxWidth="xl"
+        sx={{
+          py: {
+            xs: 3,
+            md: 5,
+          },
+        }}
       >
         <Stack spacing={3}>
           <Paper
             elevation={0}
             sx={{
               p: {
-                xs: 2.5,
-                sm: 3.5,
+                xs: 3,
+                md: 4,
               },
               borderRadius: 3,
-              border: "1px solid",
-              borderColor: "divider",
               background:
-                "linear-gradient(135deg, #FFFFFF 0%, #F5F7FF 100%)",
+                "linear-gradient(135deg, #1976d2 0%, #512da8 100%)",
+              color: "common.white",
             }}
           >
             <Box
               sx={{
                 display: "flex",
-                flexDirection: {
-                  xs: "column",
-                  sm: "row",
-                },
+                justifyContent:
+                  "space-between",
                 alignItems: {
                   xs: "stretch",
                   sm: "center",
                 },
-                justifyContent:
-                  "space-between",
+                flexDirection: {
+                  xs: "column",
+                  sm: "row",
+                },
                 gap: 2,
               }}
             >
               <Box>
                 <Typography
+                  variant="overline"
+                  sx={{
+                    opacity: 0.8,
+                    letterSpacing: 1.5,
+                  }}
+                >
+                  Profile Management
+                </Typography>
+
+                <Typography
                   component="h1"
                   variant="h4"
                   sx={{
                     fontWeight: 700,
-                    letterSpacing: -0.6,
                   }}
                 >
                   My Profile
                 </Typography>
 
                 <Typography
-                  color="text.secondary"
-                  sx={{ mt: 0.5 }}
+                  sx={{
+                    mt: 1,
+                    opacity: 0.9,
+                  }}
                 >
                   View your account and update
                   your personal information.
@@ -488,27 +501,31 @@ export default function EmployeeProfilePage():
                 direction="row"
                 spacing={1}
               >
-                <Tooltip title="Refresh profile">
-                  <span>
-                    <IconButton
-                      type="button"
-                      disabled={
-                        loading || saving
-                      }
-                      onClick={() =>
-                        void loadProfile()
-                      }
-                      sx={{
-                        border: "1px solid",
-                        borderColor: "divider",
-                        bgcolor:
-                          "background.paper",
-                      }}
-                    >
-                      <RefreshIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  disabled={
+                    loading || saving
+                  }
+                  onClick={() =>
+                    void loadProfile()
+                  }
+                  sx={{
+                    color:
+                      "common.white",
+                    borderColor:
+                      "rgba(255,255,255,0.6)",
+                    "&:hover": {
+                      borderColor:
+                        "common.white",
+                      bgcolor:
+                        "rgba(255,255,255,0.08)",
+                    },
+                  }}
+                >
+                  Refresh
+                </Button>
 
                 {!editing && (
                   <Button
@@ -523,11 +540,17 @@ export default function EmployeeProfilePage():
                       handleStartEditing
                     }
                     sx={{
-                      borderRadius: 2,
-                      px: 2.5,
+                      bgcolor:
+                        "common.white",
+                      color:
+                        "primary.main",
+                      "&:hover": {
+                        bgcolor:
+                          "rgba(255,255,255,0.92)",
+                      },
                     }}
                   >
-                    Edit profile
+                    Edit Profile
                   </Button>
                 )}
               </Stack>

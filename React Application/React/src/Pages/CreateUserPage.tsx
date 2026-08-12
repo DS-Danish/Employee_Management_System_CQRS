@@ -1,478 +1,301 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
+  useRef,
   useState,
-  type MouseEvent,
 } from "react";
 
-
-import { useNavigate } from "react-router-dom";
-import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditIcon from "@mui/icons-material/Edit";
-import GroupsIcon from "@mui/icons-material/Groups";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
 import {
   Alert,
-  Avatar,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Container,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Divider,
-  IconButton,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
   Paper,
-  Snackbar,
   Stack,
-  Tooltip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Typography,
 } from "@mui/material";
 
-import { CreateEmployeeModal } from "../Components/CreateEmployeeModal";
-import { EditEmployeeModal } from "../Components/EditEmployeeModal";
-import { EmployeeTable } from "../Components/EmployeeTable";
+import { CreateUserModal } from "../Components/CreateUserModal";
+import { getSystemUsers } from "../services/authService";
+import type { SystemUser } from "../Types/auth";
 
-import { getDepartments } from "../services/departmentService";
-
-import {
-  deleteEmployee,
-  getEmployeeDetail,
-  getEmployees,
-} from "../services/employeeService";
-
-import { getEmployeeProjects } from "../services/employeeProjectService";
-import { getProjects } from "../services/projectService";
-
-import type { Department } from "../Types/department";
-
-import type {
-  Employee,
-  EmployeeDetail,
-} from "../Types/employee";
-
-import type {
-  EmployeeProject,
-  Project,
-} from "../Types/project";
-
-
-export default function CreateUserPage(): React.ReactElement {
-  const navigate = useNavigate();
-
-  const [employees, setEmployees] =
-    useState<Employee[]>([]);
-
-  const [departments, setDepartments] =
-    useState<Department[]>([]);
-
-  const [projects, setProjects] =
-    useState<Project[]>([]);
+export default function CreateUserPage():
+  React.ReactElement {
+  const [users, setUsers] =
+    useState<SystemUser[]>([]);
 
   const [loading, setLoading] =
     useState<boolean>(true);
 
-  const [createModalOpen, setCreateModalOpen] =
-    useState<boolean>(false);
+  const [
+    createUserModalOpen,
+    setCreateUserModalOpen,
+  ] = useState<boolean>(false);
 
-  const [editModalOpen, setEditModalOpen] =
-    useState<boolean>(false);
-
-  const [selectedEmployee, setSelectedEmployee] =
-    useState<Employee | null>(null);
-
-  const [menuAnchorElement, setMenuAnchorElement] =
-    useState<HTMLElement | null>(null);
-
-  const [deletingEmployeeId, setDeletingEmployeeId] =
-    useState<string | null>(null);
-
-  const [pendingDeletion, setPendingDeletion] =
-    useState<Employee | null>(null);
-
-  const [error, setError] = useState<string>("");
-
-  const [successMessage, setSuccessMessage] =
+  const [error, setError] =
     useState<string>("");
 
-  const loadEmployeeRelations = useCallback(
-    async (
-      employee: Employee,
-      allDepartments: Department[],
-      allProjects: Project[],
-    ): Promise<Employee> => {
-      const [projectResult, detailResult] =
-        await Promise.allSettled([
-          getEmployeeProjects(employee.id),
+  const USERS_PER_BATCH = 10;
 
-          employee.employeeDetail
-            ? Promise.resolve(employee.employeeDetail)
-            : getEmployeeDetail(employee.id),
-        ]);
-
-      const employeeProjects: EmployeeProject[] =
-        projectResult.status === "fulfilled"
-          ? projectResult.value
-          : [];
-
-      const employeeDetail: EmployeeDetail | null =
-        detailResult.status === "fulfilled"
-          ? detailResult.value
-          : employee.employeeDetail ?? null;
-
-      const assignedProjects: Project[] =
-        employeeProjects
-          .map(
-            (
-              assignment: EmployeeProject,
-            ): Project | undefined =>
-              allProjects.find(
-                (project: Project): boolean =>
-                  project.id === assignment.projectId,
-              ),
-          )
-          .filter(
-            (
-              project: Project | undefined,
-            ): project is Project =>
-              project !== undefined,
-          );
-
-      const matchedDepartment:
-        | Department
-        | undefined = allDepartments.find(
-        (department: Department): boolean =>
-          department.id === employee.departmentId,
-      );
-
-      return {
-        ...employee,
-
-        department:
-          employee.department ??
-          matchedDepartment ??
-          null,
-
-        departmentName:
-          employee.departmentName ??
-          matchedDepartment?.name ??
-          null,
-
-        projects: assignedProjects,
-
-        employeeDetail,
-      };
-    },
-    [],
+  const [
+    visibleUserCount,
+    setVisibleUserCount,
+  ] = useState<number>(
+    USERS_PER_BATCH,
   );
 
-  const loadData = useCallback(
-    async (): Promise<void> => {
-      setLoading(true);
-      setError("");
+  const scrollContainerRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
 
-      try {
-        const [
-          employeeResponse,
-          departmentResponse,
-          projectResponse,
-        ] = await Promise.all([
-          getEmployees(),
-          getDepartments(),
-          getProjects(),
-        ]);
+  const loadMoreTriggerRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
 
-        const employeesWithRelations: Employee[] =
-          await Promise.all(
-            employeeResponse.map(
-              (employee: Employee) =>
-                loadEmployeeRelations(
-                  employee,
-                  departmentResponse,
-                  projectResponse,
-                ),
-            ),
-          );
+  const displayedUsers:
+    SystemUser[] =
+    users.slice(
+      0,
+      visibleUserCount,
+    );
 
-        setEmployees(employeesWithRelations);
-        setDepartments(departmentResponse);
-        setProjects(projectResponse);
-      } catch (caughtError: unknown) {
-        const message: string =
-          caughtError instanceof Error
-            ? caughtError.message
-            : "Unable to load employee information.";
-
-        setError(message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [loadEmployeeRelations],
-  );
+  const hasMoreUsers: boolean =
+    visibleUserCount <
+    users.length;
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
-
-  function handleMenuOpen(
-    event: MouseEvent<HTMLButtonElement>,
-    employee: Employee,
-  ): void {
-    setMenuAnchorElement(event.currentTarget);
-    setSelectedEmployee(employee);
-  }
-
-  function handleMenuClose(): void {
-    setMenuAnchorElement(null);
-  }
-
-  function handleEditOpen(): void {
-    if (!selectedEmployee) {
-      return;
-    }
-
-    setMenuAnchorElement(null);
-    setEditModalOpen(true);
-  }
-
-  function handleEditClose(): void {
-    setEditModalOpen(false);
-    setSelectedEmployee(null);
-  }
-
-  async function handleEmployeeCreated(): Promise<void> {
-    setCreateModalOpen(false);
-    setSuccessMessage(
-      "Employee created successfully.",
+    setVisibleUserCount(
+      USERS_PER_BATCH,
     );
+  }, [users]);
 
-    await loadData();
-  }
+  useEffect(() => {
+    const trigger:
+      HTMLDivElement | null =
+      loadMoreTriggerRef.current;
 
-  async function handleEmployeeUpdated(): Promise<void> {
-    setEditModalOpen(false);
-    setSelectedEmployee(null);
-
-    setSuccessMessage(
-      "Employee updated successfully.",
-    );
-
-    await loadData();
-  }
-
-  function handleMenuDelete(): void {
-    if (!selectedEmployee) {
+    if (!trigger || !hasMoreUsers) {
       return;
     }
 
-    setPendingDeletion(selectedEmployee);
-    setMenuAnchorElement(null);
-  }
+    const observer =
+      new IntersectionObserver(
+        (
+          entries:
+            IntersectionObserverEntry[],
+        ): void => {
+          const entry:
+            IntersectionObserverEntry | undefined =
+            entries[0];
 
-  function handleCancelDelete(): void {
-    if (deletingEmployeeId) {
-      return;
-    }
-
-    setPendingDeletion(null);
-    setSelectedEmployee(null);
-  }
-
-  async function handleConfirmDelete(): Promise<void> {
-    if (!pendingDeletion || deletingEmployeeId) {
-      return;
-    }
-
-    const employeeToDelete: Employee =
-      pendingDeletion;
-
-    setDeletingEmployeeId(employeeToDelete.id);
-    setError("");
-
-    try {
-      await deleteEmployee(employeeToDelete.id);
-
-      setPendingDeletion(null);
-      setSelectedEmployee(null);
-
-      setSuccessMessage(
-        "Employee deleted successfully.",
+          if (entry?.isIntersecting) {
+            setVisibleUserCount(
+              (
+                currentCount:
+                  number,
+              ): number =>
+                Math.min(
+                  currentCount +
+                    USERS_PER_BATCH,
+                  users.length,
+                ),
+            );
+          }
+        },
+        {
+          root:
+            scrollContainerRef.current,
+          rootMargin:
+            "150px 0px",
+          threshold: 0.1,
+        },
       );
 
-      await loadData();
-    } catch (caughtError: unknown) {
-      const message: string =
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Unable to delete the employee.";
+    observer.observe(trigger);
 
-      setError(message);
-    } finally {
-      setDeletingEmployeeId(null);
-    }
-  }
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    hasMoreUsers,
+    users.length,
+  ]);
 
-  const pendingDeletionName: string = useMemo(
-    () =>
-      pendingDeletion
-        ? pendingDeletion.fullName?.trim() ||
-          pendingDeletion.email
-        : "",
-    [pendingDeletion],
-  );
+  const loadUsers =
+    useCallback(
+      async (): Promise<void> => {
+        setLoading(true);
+        setError("");
 
-  const isDeletingPendingEmployee: boolean =
-    Boolean(
-      pendingDeletion &&
-        deletingEmployeeId === pendingDeletion.id,
+        try {
+          const result: SystemUser[] =
+            await getSystemUsers();
+
+          setUsers(result);
+        } catch (caughtError: unknown) {
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Unable to load system users.",
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+      [],
     );
 
+  useEffect(() => {
+    void loadUsers();
+  }, [loadUsers]);
+
   return (
-    <Box sx={{ bgcolor: "#F5F7FB", minHeight: "100%", py: { xs: 2, md: 3 } }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
+    <Box
+      sx={{
+        bgcolor: "#F8FAFC",
+        minHeight: "100%",
+      }}
+    >
+      <Container
+        maxWidth="xl"
+        sx={{
+          py: {
+            xs: 3,
+            md: 5,
+          },
+        }}
+      >
         <Stack spacing={3}>
           <Paper
             elevation={0}
             sx={{
-              p: { xs: 2.5, sm: 3.5 },
-              borderRadius: 4,
-              border: "1px solid",
-              borderColor: "divider",
-              background:
-                "linear-gradient(135deg, #FFFFFF 0%, #F7F8FF 55%, #EEF2FF 100%)",
-              boxShadow: "0 10px 30px rgba(15, 23, 42, 0.06)",
-              overflow: "hidden",
-              position: "relative",
-              "&::after": {
-                content: '""',
-                position: "absolute",
-                width: 180,
-                height: 180,
-                borderRadius: "50%",
-                right: -70,
-                top: -90,
-                background: "rgba(79, 70, 229, 0.08)",
+              p: {
+                xs: 3,
+                md: 4,
               },
+              borderRadius: 3,
+              background:
+                "linear-gradient(135deg, #1976d2 0%, #512da8 100%)",
+              color: "common.white",
             }}
           >
             <Box
               sx={{
+                display: "flex",
+                justifyContent:
+                  "space-between",
                 alignItems: {
                   xs: "stretch",
                   sm: "center",
                 },
-                display: "flex",
                 flexDirection: {
                   xs: "column",
                   sm: "row",
                 },
-                justifyContent: "space-between",
                 gap: 2,
               }}
             >
-              <Box sx={{ position: "relative", zIndex: 1 }}>
+              <Box>
                 <Typography
                   variant="overline"
                   sx={{
-                    color: "#4F46E5",
-                    fontWeight: 800,
-                    letterSpacing: 1.2,
+                    opacity: 0.8,
+                    letterSpacing: 1.5,
                   }}
                 >
-                  Employee Records
+                  User Management
                 </Typography>
 
                 <Typography
                   component="h1"
                   variant="h4"
                   sx={{
-                    fontWeight: 800,
-                    letterSpacing: -0.8,
-                    color: "#0F172A",
+                    fontWeight: 700,
                   }}
                 >
-                  Employees
+                  Users
                 </Typography>
 
                 <Typography
-                  color="text.secondary"
-                  sx={{ mt: 0.5 }}
+                  sx={{
+                    mt: 1,
+                    opacity: 0.9,
+                  }}
                 >
-                  View, add, edit and manage employee information.
+                  View all users in the
+                  system and create user
+                  accounts.
                 </Typography>
               </Box>
 
-              <Stack direction="row" spacing={1} sx={{ position: "relative", zIndex: 1, flexWrap: "wrap" }}>
-                <Tooltip title="Refresh">
-                  <span>
-                    <IconButton
-                      aria-label="Refresh employees"
-                      disabled={loading}
-                      onClick={() => void loadData()}
-                      sx={{
-                        border: "1px solid",
-                        borderColor: "divider",
-                        bgcolor: "background.paper",
-                        borderRadius: 2,
-                        boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
-                        "&:hover": {
-                          bgcolor: "#F8FAFC",
-                        },
-                      }}
-                    >
-                      <RefreshIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
+              <Stack
+                direction="row"
+                spacing={1}
+              >
                 <Button
                   type="button"
                   variant="outlined"
-                  startIcon={<ManageAccountsIcon />}
-                  onClick={() => navigate("/super-admin/users/create")}
+                  startIcon={
+                    <RefreshIcon />
+                  }
+                  disabled={loading}
+                  onClick={() =>
+                    void loadUsers()
+                  }
                   sx={{
-                    borderRadius: 2.5,
-                    px: 2.5,
-                    py: 1.05,
-                    fontWeight: 700,
-                    textTransform: "none",
-                    bgcolor: "background.paper",
+                    color:
+                      "common.white",
+                    borderColor:
+                      "rgba(255,255,255,0.6)",
+                    "&:hover": {
+                      borderColor:
+                        "common.white",
+                      bgcolor:
+                        "rgba(255,255,255,0.08)",
+                    },
+                  }}
+                >
+                  Refresh
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="contained"
+                  disableElevation
+                  startIcon={
+                    <ManageAccountsIcon />
+                  }
+                  onClick={() =>
+                    setCreateUserModalOpen(
+                      true,
+                    )
+                  }
+                  sx={{
+                    bgcolor:
+                      "common.white",
+                    color:
+                      "primary.main",
+                    "&:hover": {
+                      bgcolor:
+                        "rgba(255,255,255,0.92)",
+                    },
                   }}
                 >
                   Create User
                 </Button>
-
-                <Button
-                    type="button"
-                    variant="contained"
-                    disableElevation
-                    startIcon={<AddIcon />}
-                    onClick={() =>
-                      setCreateModalOpen(true)
-                    }
-                    sx={{
-                      borderRadius: 2.5,
-                      px: 2.75,
-                      py: 1.05,
-                      fontWeight: 700,
-                      textTransform: "none",
-                      boxShadow: "0 6px 16px rgba(79, 70, 229, 0.22)",
-                    }}
-                  >
-                    Add employee
-                  </Button>
               </Stack>
             </Box>
           </Paper>
@@ -480,103 +303,66 @@ export default function CreateUserPage(): React.ReactElement {
           {error && (
             <Alert
               severity="error"
-              onClose={() => setError("")}
-              sx={{ borderRadius: 2 }}
+              onClose={() =>
+                setError("")
+              }
             >
               {error}
             </Alert>
           )}
 
-          {!loading && employees.length === 0 ? (
-            <Paper
-              variant="outlined"
+          <Paper
+            elevation={0}
+            sx={{
+              border:
+                "1px solid",
+              borderColor:
+                "divider",
+              borderRadius: 3,
+              overflow: "hidden",
+            }}
+          >
+            <Box
               sx={{
-                py: 8,
-                px: 3,
-                textAlign: "center",
-                borderRadius: 4,
-                borderStyle: "dashed",
-                borderColor: "#CBD5E1",
-                bgcolor: "background.paper",
-                boxShadow: "0 6px 20px rgba(15, 23, 42, 0.03)",
+                px: {
+                  xs: 2,
+                  sm: 3,
+                },
+                py: 2.25,
+                borderBottom:
+                  "1px solid",
+                borderColor:
+                  "divider",
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems:
+                  "center",
+                gap: 2,
               }}
             >
-              <Avatar
-                sx={{
-                  width: 64,
-                  height: 64,
-                  mx: "auto",
-                  mb: 2,
-                  bgcolor: "#EEF2FF",
-                  color: "#4F46E5",
-                }}
-              >
-                <GroupsIcon sx={{ fontSize: 32 }} />
-              </Avatar>
-
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: 600 }}
-              >
-                No employees yet
-              </Typography>
-
-              <Typography
-                color="text.secondary"
-                sx={{ mb: 3, maxWidth: 420, mx: "auto" }}
-              >
-                Add your first employee to start managing
-                employee records.
-              </Typography>
-              <Button
-                  type="button"
-                  variant="contained"
-                  disableElevation
-                  startIcon={<AddIcon />}
-                  onClick={() =>
-                    setCreateModalOpen(true)
-                  }
-                  sx={{ borderRadius: 2, px: 2.5 }}
+              <Box>
+                <Typography
+                  variant="h6"
+                  sx={{ fontWeight: 800, color: "#0F172A" }}
                 >
-                  Add employee
-                </Button>
-            </Paper>
-          ) : (
-            <Paper
-              variant="outlined"
-              sx={{
-                borderRadius: 4,
-                overflow: "hidden",
-                borderColor: "#E2E8F0",
-                bgcolor: "background.paper",
-                boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
-              }}
-            >
-              <Box
-                sx={{
-                  px: { xs: 2, sm: 3 },
-                  py: 2.25,
-                  borderBottom: "1px solid",
-                  borderColor: "divider",
-                  display: "flex",
-                  alignItems: { xs: "flex-start", sm: "center" },
-                  justifyContent: "space-between",
-                  flexDirection: { xs: "column", sm: "row" },
-                  gap: 1,
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 800, color: "#0F172A" }}
-                  >
-                    All Employees
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Employee information currently available in the system.
-                  </Typography>
-                </Box>
+                  All Users
+                </Typography>
 
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Registered accounts and
+                  their assigned roles.
+                </Typography>
+              </Box>
+
+              {loading ? (
+                <CircularProgress
+                  size={22}
+                />
+              ) : (
                 <Typography
                   variant="body2"
                   sx={{
@@ -586,199 +372,220 @@ export default function CreateUserPage(): React.ReactElement {
                     bgcolor: "#EEF2FF",
                     color: "#4F46E5",
                     fontWeight: 700,
+                    whiteSpace:
+                      "nowrap",
                   }}
                 >
-                  {employees.length} {employees.length === 1 ? "employee" : "employees"}
+                  {users.length}{" "}
+                  {users.length === 1
+                    ? "user"
+                    : "users"}
                 </Typography>
-              </Box>
+              )}
+            </Box>
 
-              <EmployeeTable
-                employees={employees}
-                loading={loading}
-                deletingEmployeeId={deletingEmployeeId}
-                renderActions={(employee: Employee) => (
-                        <Tooltip title="Employee actions">
-                          <span>
-                            <IconButton
-                              aria-label={`Actions for ${
-                                employee.fullName ||
-                                employee.email
-                              }`}
-                              disabled={
-                                deletingEmployeeId ===
-                                employee.id
+            <TableContainer
+              ref={scrollContainerRef}
+              sx={{
+                maxHeight: {
+                  xs: "58vh",
+                  md: "56vh",
+                },
+                overflowY: "auto",
+                overscrollBehavior:
+                  "contain",
+                scrollbarGutter:
+                  "stable",
+              }}
+            >
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>
+                      Sr. No
+                    </TableCell>
+
+                    <TableCell>
+                      User
+                    </TableCell>
+
+                    <TableCell>
+                      Email
+                    </TableCell>
+
+                    <TableCell>
+                      Role
+                    </TableCell>
+
+                    <TableCell>
+                      Department
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        align="center"
+                        sx={{ py: 6 }}
+                      >
+                        <CircularProgress />
+                      </TableCell>
+                    </TableRow>
+                  ) : users.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        align="center"
+                        sx={{ py: 6 }}
+                      >
+                        <Typography
+                          color="text.secondary"
+                        >
+                          No users found.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    displayedUsers.map(
+                      (
+                        user:
+                          SystemUser,
+                        index:
+                          number,
+                      ) => (
+                        <TableRow
+                          key={
+                            user.userId
+                          }
+                          hover
+                        >
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight:
+                                  600,
+                                color:
+                                  "text.secondary",
+                                fontVariantNumeric:
+                                  "tabular-nums",
+                                letterSpacing:
+                                  0.4,
+                              }}
+                            >
+                              {String(
+                                index + 1,
+                              ).padStart(
+                                3,
+                                "0",
+                              )}
+                            </Typography>
+                          </TableCell>
+
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight:
+                                  600,
+                              }}
+                            >
+                              {
+                                user.fullName
                               }
-                              onClick={(
-                                event: MouseEvent<HTMLButtonElement>,
-                              ) =>
-                                handleMenuOpen(
-                                  event,
-                                  employee,
+                            </Typography>
+                          </TableCell>
+
+                          <TableCell>
+                            {
+                              user.email
+                            }
+                          </TableCell>
+
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={
+                                formatRole(
+                                  user.role,
                                 )
                               }
-                            >
-                              <MoreVertIcon />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      )}
+                              color={
+                                getRoleColor(
+                                  user.role,
+                                )
+                              }
+                              variant="outlined"
+                            />
+                          </TableCell>
+
+                          <TableCell>
+                            {user.departmentName ??
+                              (user.role ===
+                              "SuperAdmin"
+                                ? "System-wide"
+                                : "Not assigned")}
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )
+                  )}
+                </TableBody>
+              </Table>
+
+              <Box
+                ref={loadMoreTriggerRef}
+                sx={{ height: 1 }}
               />
-            </Paper>
-          )}
+            </TableContainer>
+          </Paper>
         </Stack>
-
-        <Menu
-          anchorEl={menuAnchorElement}
-          open={Boolean(menuAnchorElement)}
-          onClose={handleMenuClose}
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "right",
-          }}
-          transformOrigin={{
-            vertical: "top",
-            horizontal: "right",
-          }}
-          slotProps={{
-            paper: {
-              sx: {
-                borderRadius: 2.5,
-                minWidth: 180,
-              },
-            },
-          }}
-        >
-          <MenuItem onClick={handleEditOpen}>
-              <ListItemIcon>
-                <EditIcon fontSize="small" />
-              </ListItemIcon>
-
-              <ListItemText>
-                Edit employee
-              </ListItemText>
-            </MenuItem>
-          <Divider />
-
-              <MenuItem
-                disabled={
-                  selectedEmployee !== null &&
-                  deletingEmployeeId === selectedEmployee.id
-                }
-                onClick={handleMenuDelete}
-                sx={{ color: "error.main" }}
-              >
-                <ListItemIcon>
-                  <DeleteIcon
-                    fontSize="small"
-                    color="error"
-                  />
-                </ListItemIcon>
-
-                <ListItemText>
-                  Delete employee
-                </ListItemText>
-              </MenuItem>
-        </Menu>
-        <Dialog
-            open={Boolean(pendingDeletion)}
-            onClose={handleCancelDelete}
-            maxWidth="xs"
-            fullWidth
-            slotProps={{
-              paper: {
-                sx: {
-                  borderRadius: 3.5,
-                },
-              },
-            }}
-          >
-          <DialogTitle sx={{ fontWeight: 700 }}>
-            Delete employee?
-          </DialogTitle>
-
-          <DialogContent>
-            <DialogContentText>
-              {pendingDeletionName
-                ? `${pendingDeletionName} will be permanently removed, along with their project assignments. This can't be undone.`
-                : "This employee will be permanently removed. This can't be undone."}
-            </DialogContentText>
-          </DialogContent>
-
-          <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button
-              type="button"
-              disabled={isDeletingPendingEmployee}
-              onClick={handleCancelDelete}
-              sx={{ borderRadius: 2 }}
-            >
-              Cancel
-            </Button>
-
-            <Button
-              type="button"
-              color="error"
-              variant="contained"
-              disableElevation
-              disabled={isDeletingPendingEmployee}
-              startIcon={
-                isDeletingPendingEmployee ? (
-                  <CircularProgress
-                    size={18}
-                    color="inherit"
-                  />
-                ) : (
-                  <DeleteIcon />
-                )
-              }
-              onClick={() =>
-                void handleConfirmDelete()
-              }
-              sx={{ borderRadius: 2 }}
-            >
-              {isDeletingPendingEmployee
-                ? "Deleting..."
-                : "Delete"}
-            </Button>
-          </DialogActions>
-          </Dialog>
-        <CreateEmployeeModal
-              open={createModalOpen}
-              departments={departments}
-              projects={projects}
-              onClose={() =>
-                setCreateModalOpen(false)
-              }
-              onCreated={handleEmployeeCreated}
-            />
-
-            <EditEmployeeModal
-              open={editModalOpen}
-              employee={selectedEmployee}
-              departments={departments}
-              projects={projects}
-              onClose={handleEditClose}
-              onUpdated={handleEmployeeUpdated}
-            />
-
-        <Snackbar
-          open={Boolean(successMessage)}
-          autoHideDuration={4000}
-          onClose={() => setSuccessMessage("")}
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "right",
-          }}
-        >
-          <Alert
-            severity="success"
-            variant="filled"
-            onClose={() => setSuccessMessage("")}
-            sx={{ borderRadius: 2 }}
-          >
-            {successMessage}
-          </Alert>
-        </Snackbar>
       </Container>
+
+      <CreateUserModal
+        open={createUserModalOpen}
+        onClose={() =>
+          setCreateUserModalOpen(
+            false,
+          )
+        }
+      />
     </Box>
   );
+}
+
+function formatRole(
+  role: SystemUser["role"],
+): string {
+  switch (role) {
+    case "SuperAdmin":
+      return "Super Admin";
+
+    case "TeamLead":
+      return "Team Lead";
+
+    case "Employee":
+      return "Employee";
+  }
+}
+
+function getRoleColor(
+  role: SystemUser["role"],
+):
+  | "error"
+  | "warning"
+  | "primary" {
+  switch (role) {
+    case "SuperAdmin":
+      return "error";
+
+    case "TeamLead":
+      return "warning";
+
+    case "Employee":
+      return "primary";
+  }
 }

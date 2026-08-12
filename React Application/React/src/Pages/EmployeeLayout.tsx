@@ -69,6 +69,11 @@ const navigationItems: NavigationItem[] = [
     icon: <EventAvailableIcon />,
   },
   {
+    label: "My Projects",
+    path: "/employee/my-projects",
+    icon: <WorkIcon />,
+  },
+  {
     label: "Employees",
     path: "/employee/employees",
     icon: <GroupsIcon />,

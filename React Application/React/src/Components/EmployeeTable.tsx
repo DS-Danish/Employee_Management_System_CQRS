@@ -1,4 +1,10 @@
-import type { ReactElement, ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 import {
   Box,
@@ -29,6 +35,84 @@ export function EmployeeTable({
   deletingEmployeeId,
   renderActions,
 }: EmployeeTableProps): ReactElement {
+  const ROWS_PER_BATCH = 10;
+
+  const [visibleEmployeeCount, setVisibleEmployeeCount] =
+    useState<number>(ROWS_PER_BATCH);
+
+  const scrollContainerRef =
+    useRef<HTMLDivElement | null>(null);
+
+  const loadMoreTriggerRef =
+    useRef<HTMLDivElement | null>(null);
+
+  const displayedEmployees: Employee[] =
+    employees.slice(
+      0,
+      visibleEmployeeCount,
+    );
+
+  const hasMoreEmployees: boolean =
+    visibleEmployeeCount <
+    employees.length;
+
+  useEffect(() => {
+    setVisibleEmployeeCount(
+      ROWS_PER_BATCH,
+    );
+  }, [employees]);
+
+  useEffect(() => {
+    const trigger: HTMLDivElement | null =
+      loadMoreTriggerRef.current;
+
+    if (!trigger || !hasMoreEmployees) {
+      return;
+    }
+
+    const observer =
+      new IntersectionObserver(
+        (
+          entries:
+            IntersectionObserverEntry[],
+        ): void => {
+          const entry:
+            IntersectionObserverEntry | undefined =
+            entries[0];
+
+          if (entry?.isIntersecting) {
+            setVisibleEmployeeCount(
+              (
+                currentCount:
+                  number,
+              ): number =>
+                Math.min(
+                  currentCount +
+                    ROWS_PER_BATCH,
+                  employees.length,
+                ),
+            );
+          }
+        },
+        {
+          root:
+            scrollContainerRef.current,
+          rootMargin:
+            "150px 0px",
+          threshold: 0.1,
+        },
+      );
+
+    observer.observe(trigger);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    employees.length,
+    hasMoreEmployees,
+  ]);
+
   if (loading) {
     return (
       <Paper
@@ -66,8 +150,20 @@ export function EmployeeTable({
   }
 
   return (
-    <TableContainer component={Paper}>
-      <Table>
+    <TableContainer
+      ref={scrollContainerRef}
+      component={Paper}
+      sx={{
+        maxHeight: {
+          xs: "58vh",
+          md: "56vh",
+        },
+        overflowY: "auto",
+        overscrollBehavior: "contain",
+        scrollbarGutter: "stable",
+      }}
+    >
+      <Table stickyHeader>
         <TableHead>
           <TableRow>
             <TableCell>Sr. No</TableCell>
@@ -87,7 +183,7 @@ export function EmployeeTable({
         </TableHead>
 
         <TableBody>
-          {employees.map(
+          {displayedEmployees.map(
             (
               employee: Employee,
               index: number,
@@ -122,7 +218,17 @@ export function EmployeeTable({
                   }}
                 >
                   <TableCell>
-                    {index + 1}
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 600,
+                        color: "text.secondary",
+                        fontVariantNumeric: "tabular-nums",
+                        letterSpacing: 0.4,
+                      }}
+                    >
+                      {String(index + 1).padStart(3, "0")}
+                    </Typography>
                   </TableCell>
 
                   <TableCell>
@@ -176,6 +282,11 @@ export function EmployeeTable({
           )}
         </TableBody>
       </Table>
+
+      <Box
+        ref={loadMoreTriggerRef}
+        sx={{ height: 1 }}
+      />
     </TableContainer>
   );
 }

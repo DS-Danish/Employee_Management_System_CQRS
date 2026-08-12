@@ -484,7 +484,7 @@ export default function PermissionManagementPage():
   return (
     <Box
       sx={{
-        bgcolor: "#F5F7FB",
+        bgcolor: "#F8FAFC",
         minHeight: "100%",
       }}
     >
@@ -498,56 +498,43 @@ export default function PermissionManagementPage():
         }}
       >
         <Stack spacing={3}>
-          {/* HEADER */}
-          <Stack
-            direction="row"
-            spacing={1.75}
+          {/* HEADER - same layout/style as Leave Requests */}
+          <Paper
+            elevation={0}
             sx={{
-              alignItems: "center",
+              p: { xs: 3, md: 4 },
+              borderRadius: 3,
+              background:
+                "linear-gradient(135deg, #1976d2 0%, #512da8 100%)",
+              color: "common.white",
             }}
           >
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: "14px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                bgcolor: alpha(
-                  ACCENT,
-                  0.12,
-                ),
-                color: ACCENT,
-                flexShrink: 0,
-              }}
-            >
-              <SecurityIcon />
-            </Box>
-
             <Box>
+              <Typography
+                variant="overline"
+                sx={{
+                  opacity: 0.8,
+                  letterSpacing: 1.5,
+                }}
+              >
+                Access Control
+              </Typography>
+
               <Typography
                 component="h1"
                 variant="h4"
-                sx={{
-                  fontWeight: 800,
-                  letterSpacing: -0.5,
-                  color: "#0F172A",
-                }}
+                sx={{ fontWeight: 700 }}
               >
                 Permission Management
               </Typography>
 
               <Typography
-                color="text.secondary"
-                sx={{ mt: 0.5 }}
+                sx={{ mt: 1, opacity: 0.9 }}
               >
-                Manage application access
-                for employees and team
-                leads by role.
+                Manage application access for employees and team leads by role.
               </Typography>
             </Box>
-          </Stack>
+          </Paper>
 
           {errorMessage && (
             <Alert

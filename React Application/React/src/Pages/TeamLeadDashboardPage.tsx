@@ -1,416 +1,431 @@
 import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { useNavigate } from "react-router-dom";
+
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import WorkIcon from "@mui/icons-material/Work";
+import GroupsIcon from "@mui/icons-material/Groups";
+import InsightsIcon from "@mui/icons-material/Insights";
+import RefreshIcon from "@mui/icons-material/Refresh";
+
+import {
   Alert,
   Avatar,
   Box,
   Button,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   Container,
   Grid,
+  IconButton,
+  Paper,
+  Pagination,
+  Skeleton,
   Stack,
+  Tooltip,
   Typography,
-  alpha,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip as ChartTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-import { AppPermissions } from "../Constants/permissions";
+import { getEmployees } from "../services/employeeService";
+import { getProjects } from "../services/projectService";
+import {
+  approveLeave,
+  getPendingLeaves,
+  rejectLeave,
+} from "../services/leaveService";
 
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import BadgeIcon from "@mui/icons-material/Badge";
-import EventAvailableIcon from "@mui/icons-material/EventAvailable";
-import GroupsIcon from "@mui/icons-material/Groups";
-import ApartmentIcon from "@mui/icons-material/Apartment";
-import WorkIcon from "@mui/icons-material/Work";
-import PendingActionsIcon from "@mui/icons-material/PendingActions";
-import PersonIcon from "@mui/icons-material/Person";
-import RefreshIcon from "@mui/icons-material/Refresh";
-
-import { getMyLeaves, getPendingLeaves } from "../services/leaveService";
 import type { StoredUser } from "../Types/auth";
-import type { Leave } from "../Types/leave";
 
-const ACCENT_INDIGO = "#4F46E5";
-const ACCENT_VIOLET = "#7C3AED";
-const ACCENT_AMBER = "#D97706";
-const ACCENT_BLUE = "#2563EB";
-const ACCENT_GREEN = "#16A34A";
-const ACCENT_RED = "#DC2626";
-const ACCENT_SLATE = "#64748B";
+interface DashboardStatistics {
+  employees: number;
+  projects: number;
+  pendingLeaves: number;
+}
 
-interface ActionCardProps {
+interface CategoryConfig {
+  key: keyof DashboardStatistics;
+  label: string;
+  color: string;
+  icon: ReactNode;
+}
+
+
+// One accent color per record type. Reused across the stat cards,
+// the header KPI strip, and both charts so everything reads as one system.
+const CATEGORY_CONFIG: CategoryConfig[] = [
+  {
+    key: "employees",
+    label: "Employees",
+    color: "#4F46E5",
+    icon: <GroupsIcon />,
+  },
+  {
+    key: "projects",
+    label: "Projects",
+    color: "#7C3AED",
+    icon: <WorkIcon />,
+  },
+  {
+    key: "pendingLeaves",
+    label: "Pending Leaves",
+    color: "#D97706",
+    icon: <EventAvailableIcon />,
+  },
+];
+
+
+interface SummaryCardProps {
+  title: string;
+  value: number;
+  loading: boolean;
   icon: ReactNode;
   color: string;
-  title: string;
-  description: string;
-  buttonLabel: string;
-  onClick: () => void;
 }
 
-interface ChartItem {
-  label: string;
-  value: number;
-  color: string;
-}
-
-interface StatusCounts {
-  pending: number;
-  approved: number;
-  rejected: number;
-}
 
 export default function TeamLeadDashboardPage(): React.ReactElement {
   const navigate = useNavigate();
   const currentUser: StoredUser | null = getStoredUser();
 
-  const userPermissions: string[] =
-    currentUser?.permissions ?? [];
+  const [statistics, setStatistics] = useState<DashboardStatistics>({
+    employees: 0,
+    projects: 0,
+    pendingLeaves: 0,
+  });
 
-  const canViewEmployees: boolean =
-    userPermissions.includes(AppPermissions.ViewEmployees);
-
-  const canViewDepartments: boolean =
-    userPermissions.includes(AppPermissions.ViewDepartments);
-
-  const canViewProjects: boolean =
-    userPermissions.includes(AppPermissions.ViewProjects);
-
-  const [myLeaves, setMyLeaves] = useState<Leave[]>([]);
-  const [pendingLeaves, setPendingLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
+  const [pendingLeaveItems, setPendingLeaveItems] = useState<
+    Record<string, unknown>[]
+  >([]);
+  const [pendingLeavePage, setPendingLeavePage] = useState<number>(1);
+  const [reviewingLeaveId, setReviewingLeaveId] = useState<string | null>(null);
+  const [leaveActionError, setLeaveActionError] = useState<string>("");
 
-  async function loadDashboard(): Promise<void> {
+  const loadDashboard = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    setError("");
+
     try {
-      setLoading(true);
-      setError("");
-
-      const [myLeavesResult, pendingLeavesResult] = await Promise.all([
-        getMyLeaves(),
+      const [employees, projects, pendingLeaves] = await Promise.all([
+        getEmployees(),
+        getProjects(),
         getPendingLeaves(),
       ]);
 
-      setMyLeaves(myLeavesResult);
-      setPendingLeaves(pendingLeavesResult);
+      setStatistics({
+        employees: employees.length,
+        projects: projects.length,
+        pendingLeaves: pendingLeaves.length,
+      });
+
+      setPendingLeaveItems(
+        pendingLeaves.map(
+          (leave: unknown): Record<string, unknown> =>
+            leave as Record<string, unknown>,
+        ),
+      );
+
     } catch (caughtError: unknown) {
-      setError(
+      const message: string =
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to load dashboard information.",
-      );
+          : "Unable to load dashboard information.";
+
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadDashboard();
-  }, []);
+  }, [loadDashboard]);
 
-  const myLeaveCounts: StatusCounts = useMemo(() => {
-    return myLeaves.reduce<StatusCounts>(
-      (counts: StatusCounts, leave: Leave): StatusCounts => {
-        const status: string = normalizeLeaveStatus(leave.status);
+  const handleLeaveReview = useCallback(
+    async (
+      leave: Record<string, unknown>,
+      action: "approve" | "reject",
+    ): Promise<void> => {
+      const leaveRequestId: string | null = getTextValue(leave, [
+        "id",
+        "leaveRequestId",
+        "requestId",
+      ]);
 
-        if (status === "pending") {
-          counts.pending += 1;
-        } else if (status === "approved") {
-          counts.approved += 1;
-        } else if (status === "rejected") {
-          counts.rejected += 1;
+      if (!leaveRequestId) {
+        setLeaveActionError("Unable to identify this leave request.");
+        return;
+      }
+
+      setReviewingLeaveId(leaveRequestId);
+      setLeaveActionError("");
+
+      try {
+        if (action === "approve") {
+          await approveLeave(leaveRequestId);
+        } else {
+          // The reject API requires a non-empty comment.
+          await rejectLeave(leaveRequestId, "Rejected by Team Lead");
         }
 
-        return counts;
-      },
-      {
-        pending: 0,
-        approved: 0,
-        rejected: 0,
-      },
-    );
-  }, [myLeaves]);
-
-  const myLeaveChart: ChartItem[] = useMemo(
-    () => [
-      {
-        label: "Pending",
-        value: myLeaveCounts.pending,
-        color: ACCENT_AMBER,
-      },
-      {
-        label: "Approved",
-        value: myLeaveCounts.approved,
-        color: ACCENT_GREEN,
-      },
-      {
-        label: "Rejected",
-        value: myLeaveCounts.rejected,
-        color: ACCENT_RED,
-      },
-    ],
-    [myLeaveCounts],
+        await loadDashboard();
+      } catch (actionError: unknown) {
+        setLeaveActionError(
+          actionError instanceof Error
+            ? actionError.message
+            : `Unable to ${action} leave request.`,
+        );
+      } finally {
+        setReviewingLeaveId(null);
+      }
+    },
+    [loadDashboard],
   );
 
-  const pendingLeaveTypeChart: ChartItem[] = useMemo(() => {
-    const counts = new Map<string, number>();
+  const chartData = useMemo(
+    () =>
+      CATEGORY_CONFIG.map((category) => ({
+        name: category.label,
+        value: statistics[category.key],
+        color: category.color,
+      })),
+    [statistics],
+  );
 
-    pendingLeaves.forEach((leave: Leave) => {
-      const label: string = getLeaveTypeText(leave.leaveType);
-      counts.set(label, (counts.get(label) ?? 0) + 1);
-    });
+  const totalRecords: number =
+    statistics.employees +
+    statistics.projects +
+    statistics.pendingLeaves;
 
-    const colors: string[] = [
-      ACCENT_INDIGO,
-      ACCENT_AMBER,
-      ACCENT_VIOLET,
-      ACCENT_BLUE,
-      ACCENT_GREEN,
-      ACCENT_SLATE,
-    ];
+  const PENDING_LEAVES_PER_PAGE = 5;
+  const pendingLeavePageCount: number = Math.max(
+    1,
+    Math.ceil(pendingLeaveItems.length / PENDING_LEAVES_PER_PAGE),
+  );
 
-    return Array.from(counts.entries())
-      .sort((a: [string, number], b: [string, number]) => b[1] - a[1])
-      .map(
-        ([label, value]: [string, number], index: number): ChartItem => ({
-          label,
-          value,
-          color: colors[index % colors.length],
-        }),
-      );
-  }, [pendingLeaves]);
+  const paginatedPendingLeaves: Record<string, unknown>[] =
+    pendingLeaveItems.slice(
+      (pendingLeavePage - 1) * PENDING_LEAVES_PER_PAGE,
+      pendingLeavePage * PENDING_LEAVES_PER_PAGE,
+    );
+
+  useEffect(() => {
+    if (pendingLeavePage > pendingLeavePageCount) {
+      setPendingLeavePage(pendingLeavePageCount);
+    }
+  }, [pendingLeavePage, pendingLeavePageCount]);
 
   return (
     <Box sx={{ bgcolor: "#F5F7FB", minHeight: "100%" }}>
       <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}>
         <Stack spacing={4}>
-          <Card
-            elevation={0}
-            sx={{
-              position: "relative",
-              overflow: "hidden",
-              borderRadius: 3,
-              background:
-                "linear-gradient(120deg, #0B1120 0%, #1E1B4B 55%, #4F46E5 100%)",
-              color: "common.white",
-              "&::before": {
-                content: '""',
-                position: "absolute",
-                inset: 0,
-                backgroundImage:
-                  "radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)",
-                backgroundSize: "18px 18px",
-                opacity: 0.5,
-                pointerEvents: "none",
-              },
-            }}
-          >
-            <CardContent sx={{ position: "relative", p: { xs: 3, md: 4 } }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: { xs: "flex-start", md: "center" },
-                  justifyContent: "space-between",
-                  flexDirection: { xs: "column", md: "row" },
-                  gap: 3,
-                }}
-              >
-                <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-                  <Avatar
-                    sx={{
-                      width: 58,
-                      height: 58,
-                      display: { xs: "none", sm: "flex" },
-                      fontWeight: 800,
-                      fontSize: 18,
-                      bgcolor: "rgba(255,255,255,0.14)",
-                      border: "1px solid rgba(255,255,255,0.2)",
-                    }}
-                  >
-                    {getInitials(currentUser?.fullName)}
-                  </Avatar>
-
-                  <Box>
-                    <Typography
-                      variant="overline"
-                      sx={{ opacity: 0.75, letterSpacing: 2 }}
-                    >
-                      Employee Management System
-                    </Typography>
-
-                    <Typography variant="h4" sx={{ fontWeight: 800, mt: 0.5 }}>
-                      Team Lead Dashboard
-                    </Typography>
-
-                    <Typography sx={{ mt: 1, opacity: 0.85, maxWidth: 650 }}>
-                      Welcome back, {currentUser?.fullName ?? "Team Lead"}.
-                      Manage your team and monitor leave activity from one place.
-                    </Typography>
-                  </Box>
-                </Stack>
-
-                <Button
-                  type="button"
-                  variant="outlined"
-                  startIcon={
-                    loading ? (
-                      <CircularProgress size={16} color="inherit" />
-                    ) : (
-                      <RefreshIcon />
-                    )
-                  }
-                  disabled={loading}
-                  onClick={() => void loadDashboard()}
-                  sx={{
-                    color: "common.white",
-                    borderColor: "rgba(255,255,255,0.45)",
-                    borderRadius: 2,
-                    textTransform: "none",
-                    fontWeight: 700,
-                    "&:hover": {
-                      borderColor: "common.white",
-                      bgcolor: "rgba(255,255,255,0.08)",
-                    },
-                  }}
-                >
-                  Refresh
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
+          <DashboardHeader
+            fullName={currentUser?.fullName}
+            loading={loading}
+            onRefresh={() => void loadDashboard()}
+          />
 
           {error && (
-            <Alert severity="error" onClose={() => setError("")}>
+            <Alert severity="error" onClose={() => setError("")} sx={{ borderRadius: 2 }}>
               {error}
             </Alert>
           )}
 
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800 }}>
-              Management
-            </Typography>
-            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-              Access only the modules currently available to your Team Lead account.
-            </Typography>
-          </Box>
+          <SectionHeading title="Overview" subtitle="Current employee and project information available to the Team Lead." />
 
           <Grid container spacing={3}>
-            {canViewEmployees && (
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                <ActionCard
-                  icon={<GroupsIcon />}
-                  color={ACCENT_INDIGO}
-                  title="Employees"
-                  description="View and manage employee records available to your account."
-                  buttonLabel="Manage employees"
-                  onClick={() => navigate("/team-lead/employees")}
+            {CATEGORY_CONFIG.map((category) => (
+              <Grid key={category.key} size={{ xs: 12, sm: 6, md: 4 }}>
+                <SummaryCard
+                  title={category.label}
+                  value={statistics[category.key]}
+                  loading={loading}
+                  icon={category.icon}
+                  color={category.color}
                 />
               </Grid>
-            )}
+            ))}
+          </Grid>
 
-            {canViewDepartments && (
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                <ActionCard
-                  icon={<ApartmentIcon />}
-                  color="#0D9488"
-                  title="Departments"
-                  description="View department information available to your account."
-                  buttonLabel="Manage departments"
-                  onClick={() => navigate("/team-lead/departments")}
-                />
-              </Grid>
-            )}
+          <SectionHeading
+            title="Insights"
+            subtitle="Employee records, projects and pending employee leave requests."
+          />
 
-            {canViewProjects && (
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                <ActionCard
-                  icon={<WorkIcon />}
-                  color={ACCENT_VIOLET}
-                  title="Projects"
-                  description="View and manage projects available to your account."
-                  buttonLabel="Manage projects"
-                  onClick={() => navigate("/team-lead/projects")}
-                />
-              </Grid>
-            )}
-
-            <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-              <ActionCard
-                icon={<EventAvailableIcon />}
-                color={ACCENT_BLUE}
-                title="My Leaves"
-                description="Apply for leave, review your balance and track your requests."
-                buttonLabel="Manage my leaves"
-                onClick={() => navigate("/team-lead/leaves")}
-              />
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, lg: 7 }}>
+              <ChartCard title="Records by category" icon={<InsightsIcon fontSize="small" />}>
+                {loading ? (
+                  <Skeleton variant="rounded" height={280} />
+                ) : totalRecords === 0 ? (
+                  <EmptyChartState message="No records yet. Data will appear here once employees, projects or pending leave requests are available." />
+                ) : (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={chartData} barSize={40}>
+                      <CartesianGrid vertical={false} stroke={alpha("#0B1120", 0.06)} />
+                      <XAxis
+                        dataKey="name"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 12, fill: "#64748B" }}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 12, fill: "#64748B" }}
+                        width={28}
+                      />
+                      <ChartTooltip
+                        cursor={{ fill: alpha("#0B1120", 0.04) }}
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid #E2E8F0",
+                          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.08)",
+                        }}
+                      />
+                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                        {chartData.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </ChartCard>
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-              <ActionCard
-                icon={<PendingActionsIcon />}
-                color={ACCENT_AMBER}
-                title="Pending Requests"
-                description={
-                  loading
-                    ? "Loading pending employee leave requests..."
-                    : `${pendingLeaves.length} leave request${
-                        pendingLeaves.length === 1 ? "" : "s"
-                      } currently require your review.`
-                }
-                buttonLabel="Review requests"
-                badge={loading ? undefined : pendingLeaves.length}
+            <Grid size={{ xs: 12, lg: 5 }}>
+              <ChartCard title="Share of total" icon={<InsightsIcon fontSize="small" />}>
+                {loading ? (
+                  <Skeleton variant="rounded" height={280} />
+                ) : totalRecords === 0 ? (
+                  <EmptyChartState message="Nothing to show yet." />
+                ) : (
+                  <Box sx={{ position: "relative" }}>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <PieChart>
+                        <Pie
+                          data={chartData}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={70}
+                          outerRadius={100}
+                          paddingAngle={3}
+                          stroke="none"
+                        >
+                          {chartData.map((entry) => (
+                            <Cell key={entry.name} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <ChartTooltip
+                          contentStyle={{
+                            borderRadius: 12,
+                            border: "1px solid #E2E8F0",
+                            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.08)",
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        textAlign: "center",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      <Typography variant="h4" sx={{ fontWeight: 800, color: "#0B1120" }}>
+                        {totalRecords}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#64748B" }}>
+                        total records
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+
+                <Stack
+                  direction="row"
+                  sx={{
+                    gap: 1,
+                    mb: 2,
+                    alignItems: "center",
+                  }}
+                >
+                  {CATEGORY_CONFIG.map((category: CategoryConfig) => (
+                    <Stack
+                      key={category.key}
+                      direction="row"
+                      spacing={0.75}
+                      sx={{ alignItems: "center" }}
+                    >
+                      <Box sx={{ width: 10, height: 10, borderRadius: "3px", bgcolor: category.color }} />
+                      <Typography variant="caption" sx={{ color: "#64748B" }}>
+                        {category.label}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              </ChartCard>
+            </Grid>
+          </Grid>
+
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: { xs: "flex-start", sm: "center" },
+              justifyContent: "space-between",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2,
+            }}
+          >
+            <SectionHeading
+              title="Pending Leaves"
+              subtitle="Latest leave requests waiting for review."
+            />
+
+            {pendingLeaveItems.length > 5 && (
+              <Button
+                type="button"
+                variant="outlined"
                 onClick={() => navigate("/team-lead/leave-requests")}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-              <ActionCard
-                icon={<PersonIcon />}
-                color={ACCENT_SLATE}
-                title="My Profile"
-                description="Review your account details and personal profile information."
-                buttonLabel="View profile"
-                onClick={() => navigate("/team-lead/profile")}
-              />
-            </Grid>
-          </Grid>
-
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="h5" sx={{ fontWeight: 800 }}>
-              Insights
-            </Typography>
-            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-              Live leave information based on your current account and pending team requests.
-            </Typography>
+                sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
+              >
+                See more
+              </Button>
+            )}
           </Box>
 
-          <Grid container spacing={3}>
-            <Grid size={{ xs: 12, lg: 6 }}>
-              <ChartCard
-                title="My Leave Status"
-                description="Status of leave requests submitted from your account."
-                icon={<EventAvailableIcon />}
-                accent={ACCENT_BLUE}
-                data={myLeaveChart}
-                loading={loading}
-                emptyMessage="You have not submitted any leave requests yet."
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, lg: 6 }}>
-              <ChartCard
-                title="Pending Team Leaves"
-                description="Pending employee requests grouped by leave type."
-                icon={<PendingActionsIcon />}
-                accent={ACCENT_AMBER}
-                data={pendingLeaveTypeChart}
-                loading={loading}
-                emptyMessage="There are no pending team leave requests."
-              />
-            </Grid>
-          </Grid>
+          {leaveActionError && (
+            <Alert severity="error" onClose={() => setLeaveActionError("")}>
+              {leaveActionError}
+            </Alert>
+          )}
 
           <Card
             sx={{
@@ -418,52 +433,170 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
               border: 1,
               borderColor: "divider",
               boxShadow: "none",
+              overflow: "hidden",
             }}
           >
-            <CardContent sx={{ p: 3 }}>
+            {loading ? (
+              <Box sx={{ p: 3 }}>
+                <Stack spacing={1.5}>
+                  {Array.from({ length: 3 }).map((_, index: number) => (
+                    <Skeleton key={index} variant="rounded" height={64} />
+                  ))}
+                </Stack>
+              </Box>
+            ) : pendingLeaveItems.length === 0 ? (
               <Box
                 sx={{
-                  display: "flex",
-                  alignItems: { xs: "flex-start", sm: "center" },
-                  justifyContent: "space-between",
-                  flexDirection: { xs: "column", sm: "row" },
-                  gap: 2,
+                  py: 6,
+                  px: 3,
+                  textAlign: "center",
+                  color: "text.secondary",
                 }}
               >
-                <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-                  <Avatar
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      fontWeight: 700,
-                      background: `linear-gradient(135deg, ${ACCENT_BLUE} 0%, ${ACCENT_VIOLET} 100%)`,
-                    }}
-                  >
-                    {getInitials(currentUser?.fullName)}
-                  </Avatar>
+                <EventAvailableIcon sx={{ fontSize: 42, mb: 1, color: "#D97706" }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#0B1120" }}>
+                  No pending leave requests
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                  New pending requests will appear here.
+                </Typography>
+              </Box>
+            ) : (
+              <Stack divider={<Box sx={{ borderTop: "1px solid #E2E8F0" }} />}>
+                {paginatedPendingLeaves.map(
+                  (leave: Record<string, unknown>, index: number) => (
+                    <Box
+                      key={getLeaveKey(leave, index)}
+                      sx={{
+                        px: { xs: 2, sm: 3 },
+                        py: 2,
+                        display: "flex",
+                        alignItems: { xs: "flex-start", md: "center" },
+                        justifyContent: "space-between",
+                        flexDirection: { xs: "column", md: "row" },
+                        gap: 2,
+                      }}
+                    >
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                        <Avatar
+                          sx={{
+                            width: 42,
+                            height: 42,
+                            bgcolor: alpha("#D97706", 0.12),
+                            color: "#D97706",
+                          }}
+                        >
+                          <EventAvailableIcon fontSize="small" />
+                        </Avatar>
 
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 800 }}>
-                      {currentUser?.fullName ?? "Team Lead"}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {currentUser?.email ?? "Email not available"}
-                    </Typography>
-                  </Box>
-                </Stack>
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                            {getLeaveEmployeeLabel(leave)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {getLeaveTypeLabel(leave)}
+                          </Typography>
+                        </Box>
+                      </Stack>
 
-                <Chip
-                  icon={<BadgeIcon sx={{ fontSize: 16 }} />}
-                  label={currentUser?.role ?? "TeamLead"}
-                  sx={{
-                    fontWeight: 700,
-                    bgcolor: alpha(ACCENT_BLUE, 0.1),
-                    color: ACCENT_BLUE,
-                    "& .MuiChip-icon": { color: ACCENT_BLUE },
-                  }}
+                      <Stack
+                        direction={{ xs: "column", lg: "row" }}
+                        spacing={{ xs: 1.5, lg: 3 }}
+                        sx={{
+                          minWidth: { lg: 520 },
+                          alignItems: { xs: "stretch", lg: "center" },
+                        }}
+                      >
+                        <Box sx={{ minWidth: 170 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Leave period
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {getLeavePeriod(leave)}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ minWidth: 70 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Status
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 700, color: "#D97706" }}
+                          >
+                            {getTextValue(leave, ["status"]) ?? "Pending"}
+                          </Typography>
+                        </Box>
+
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            type="button"
+                            size="small"
+                            variant="contained"
+                            disabled={
+                              reviewingLeaveId === getLeaveRequestId(leave)
+                            }
+                            onClick={() => void handleLeaveReview(leave, "approve")}
+                            sx={{
+                              textTransform: "none",
+                              fontWeight: 700,
+                              borderRadius: 2,
+                            }}
+                          >
+                            {reviewingLeaveId === getLeaveRequestId(leave)
+                              ? "Processing..."
+                              : "Approve"}
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            disabled={
+                              reviewingLeaveId === getLeaveRequestId(leave)
+                            }
+                            onClick={() => void handleLeaveReview(leave, "reject")}
+                            sx={{
+                              textTransform: "none",
+                              fontWeight: 700,
+                              borderRadius: 2,
+                            }}
+                          >
+                            Reject
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    </Box>
+                  ),
+                )}
+              </Stack>
+            )}
+
+            {!loading && pendingLeaveItems.length > PENDING_LEAVES_PER_PAGE && (
+              <Box
+                sx={{
+                  px: { xs: 2, sm: 3 },
+                  py: 2,
+                  display: "flex",
+                  justifyContent: "center",
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <Pagination
+                  count={pendingLeavePageCount}
+                  page={pendingLeavePage}
+                  onChange={(_event, page: number): void =>
+                    setPendingLeavePage(page)
+                  }
+                  color="primary"
+                  shape="rounded"
+                  showFirstButton
+                  showLastButton
                 />
               </Box>
-            </CardContent>
+            )}
           </Card>
         </Stack>
       </Container>
@@ -471,137 +604,144 @@ export default function TeamLeadDashboardPage(): React.ReactElement {
   );
 }
 
-interface ExtendedActionCardProps extends ActionCardProps {
-  badge?: number;
+interface DashboardHeaderProps {
+  fullName?: string;
+  loading: boolean;
+  onRefresh: () => void;
 }
 
-function ActionCard({
-  icon,
-  color,
-  title,
-  description,
-  buttonLabel,
-  badge,
-  onClick,
-}: ExtendedActionCardProps): React.ReactElement {
+function DashboardHeader({
+  fullName,
+  loading,
+  onRefresh,
+}: DashboardHeaderProps): React.ReactElement {
   return (
-    <Card
+    <Paper
+      elevation={0}
       sx={{
-        height: "100%",
-        borderRadius: 3,
-        border: 1,
-        borderColor: "divider",
-        boxShadow: "none",
+        position: "relative",
         overflow: "hidden",
-        transition: "transform 0.2s ease, box-shadow 0.2s ease",
-        "&:hover": {
-          transform: "translateY(-3px)",
-          boxShadow: 3,
+        p: { xs: 3, md: 4 },
+        borderRadius: 3,
+        background: "linear-gradient(120deg, #0B1120 0%, #1E1B4B 55%, #4F46E5 100%)",
+        color: "common.white",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          backgroundImage: "radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)",
+          backgroundSize: "18px 18px",
+          opacity: 0.5,
+          pointerEvents: "none",
         },
       }}
     >
-      <Box sx={{ height: 4, bgcolor: color }} />
-
-      <CardContent
-        sx={{
-          p: 3,
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+      <Box sx={{ position: "relative" }}>
         <Box
           sx={{
             display: "flex",
-            alignItems: "flex-start",
             justifyContent: "space-between",
-            mb: 2,
+            alignItems: { xs: "flex-start", sm: "center" },
+            flexDirection: { xs: "column", sm: "row" },
+            gap: 2,
           }}
         >
-          <Avatar sx={{ bgcolor: alpha(color, 0.12), color }}>
-            {icon}
-          </Avatar>
+          <Box>
+            <Typography variant="overline" sx={{ opacity: 0.75, letterSpacing: 2 }}>
+              Employee Management System
+            </Typography>
 
-          {badge !== undefined && (
-            <Chip
-              label={badge}
-              size="small"
-              sx={{
-                minWidth: 34,
-                fontWeight: 800,
-                bgcolor: alpha(color, 0.1),
-                color,
-              }}
-            />
-          )}
+            <Typography variant="h4" sx={{ fontWeight: 800, mt: 0.5 }}>
+              Team Lead Dashboard
+            </Typography>
+
+            <Typography sx={{ mt: 1, opacity: 0.85, maxWidth: 640 }}>
+              Welcome back, {fullName ?? "Team Lead"}. Monitor employees, projects and review pending employee leave requests from one place.
+            </Typography>
+          </Box>
+
+          <Tooltip title="Refresh dashboard">
+            <span>
+              <IconButton
+                disabled={loading}
+                onClick={onRefresh}
+                sx={{
+                  bgcolor: "rgba(255,255,255,0.12)",
+                  color: "common.white",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.20)" },
+                }}
+              >
+                {loading ? <CircularProgress size={22} color="inherit" /> : <RefreshIcon />}
+              </IconButton>
+            </span>
+          </Tooltip>
         </Box>
 
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
-          {title}
-        </Typography>
-
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ mt: 1, mb: 3, flexGrow: 1, lineHeight: 1.65 }}
-        >
-          {description}
-        </Typography>
-
-        <Button
-          type="button"
-          variant="contained"
-          disableElevation
-          endIcon={<ArrowForwardIcon />}
-          onClick={onClick}
-          sx={{
-            alignSelf: "flex-start",
-            borderRadius: 2,
-            bgcolor: color,
-            textTransform: "none",
-            fontWeight: 700,
-            "&:hover": {
-              bgcolor: color,
-              filter: "brightness(0.92)",
-            },
-          }}
-        >
-          {buttonLabel}
-        </Button>
-      </CardContent>
-    </Card>
+      </Box>
+    </Paper>
   );
 }
 
-interface ChartCardProps {
-  title: string;
-  description: string;
-  icon: ReactNode;
-  accent: string;
-  data: ChartItem[];
-  loading: boolean;
-  emptyMessage: string;
+function SectionHeading({ title, subtitle }: { title: string; subtitle: string }): React.ReactElement {
+  return (
+    <Box>
+      <Typography variant="h5" sx={{ fontWeight: 700, color: "#0B1120" }}>
+        {title}
+      </Typography>
+      <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+        {subtitle}
+      </Typography>
+    </Box>
+  );
 }
 
 function ChartCard({
   title,
-  description,
   icon,
-  accent,
-  data,
-  loading,
-  emptyMessage,
-}: ChartCardProps): React.ReactElement {
-  const total: number = data.reduce(
-    (sum: number, item: ChartItem): number => sum + item.value,
-    0,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  children: ReactNode;
+}): React.ReactElement {
+  return (
+    <Card sx={{ height: "100%", borderRadius: 3, border: 1, borderColor: "divider", boxShadow: "none" }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ mb: 2, alignItems: "center" }}
+>
+          <Box sx={{ color: "#4F46E5", display: "flex" }}>{icon}</Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            {title}
+          </Typography>
+        </Stack>
+        {children}
+      </CardContent>
+    </Card>
   );
+}
 
-  const maxValue: number = Math.max(
-    1,
-    ...data.map((item: ChartItem): number => item.value),
+function EmptyChartState({ message }: { message: string }): React.ReactElement {
+  return (
+    <Box
+      sx={{
+        height: 280,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        color: "text.secondary",
+        px: 4,
+      }}
+    >
+      <Typography variant="body2">{message}</Typography>
+    </Box>
   );
+}
 
+function SummaryCard({ title, value, loading, icon, color }: SummaryCardProps): React.ReactElement {
   return (
     <Card
       sx={{
@@ -610,246 +750,162 @@ function ChartCard({
         border: 1,
         borderColor: "divider",
         boxShadow: "none",
+        borderLeft: `3px solid ${color}`,
       }}
     >
-      <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 0.75 }}>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: "11px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              bgcolor: alpha(accent, 0.1),
-              color: accent,
-            }}
-          >
-            {icon}
-          </Box>
+      <CardContent sx={{ p: 3, display: "flex", alignItems: "center", gap: 2 }}>
+        <Avatar sx={{ width: 52, height: 52, bgcolor: alpha(color, 0.12), color }}>{icon}</Avatar>
 
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              {title}
+        <Box>
+          {loading ? (
+            <Skeleton width={60} height={38} />
+          ) : (
+            <Typography variant="h4" sx={{ fontWeight: 700, color: "#0B1120" }}>
+              {value}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {description}
-            </Typography>
-          </Box>
-        </Stack>
+          )}
 
-        {loading ? (
-          <Box
-            sx={{
-              height: 250,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <CircularProgress size={30} />
-          </Box>
-        ) : total === 0 ? (
-          <Box
-            sx={{
-              height: 250,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              textAlign: "center",
-              px: 3,
-            }}
-          >
-            <Typography color="text.secondary">
-              {emptyMessage}
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ mt: 4 }}>
-            <Box
-              sx={{
-                height: 190,
-                display: "flex",
-                alignItems: "flex-end",
-                justifyContent: "space-around",
-                gap: 2,
-                px: { xs: 0, sm: 2 },
-                borderBottom: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              {data.map((item: ChartItem) => {
-                const height: number = Math.max(
-                  18,
-                  (item.value / maxValue) * 150,
-                );
-
-                return (
-                  <Box
-                    key={item.label}
-                    sx={{
-                      flex: 1,
-                      maxWidth: 100,
-                      height: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "flex-end",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{ fontWeight: 800, mb: 0.75 }}
-                    >
-                      {item.value}
-                    </Typography>
-
-                    <Box
-                      sx={{
-                        width: "58%",
-                        minWidth: 30,
-                        height,
-                        borderRadius: "8px 8px 0 0",
-                        bgcolor: item.color,
-                        transition: "height 250ms ease",
-                      }}
-                    />
-                  </Box>
-                );
-              })}
-            </Box>
-
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-around",
-                gap: 2,
-                mt: 1.25,
-                px: { xs: 0, sm: 2 },
-              }}
-            >
-              {data.map((item: ChartItem) => (
-                <Typography
-                  key={item.label}
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{
-                    flex: 1,
-                    maxWidth: 100,
-                    textAlign: "center",
-                    fontWeight: 600,
-                  }}
-                >
-                  {item.label}
-                </Typography>
-              ))}
-            </Box>
-          </Box>
-        )}
+          <Typography color="text.secondary">{title}</Typography>
+        </Box>
       </CardContent>
     </Card>
   );
 }
 
+
+function getTextValue(
+  record: Record<string, unknown>,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value: unknown = record[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+
+    if (typeof value === "number") {
+      return String(value);
+    }
+  }
+
+  return null;
+}
+
+function getLeaveRequestId(
+  leave: Record<string, unknown>,
+): string | null {
+  return getTextValue(leave, ["id", "leaveRequestId", "requestId"]);
+}
+
+function getLeaveKey(
+  leave: Record<string, unknown>,
+  index: number,
+): string {
+  return (
+    getTextValue(leave, ["id", "leaveRequestId", "requestId"]) ??
+    `pending-leave-${index}`
+  );
+}
+
+function getLeaveEmployeeLabel(
+  leave: Record<string, unknown>,
+): string {
+  const directName: string | null = getTextValue(leave, [
+    "employeeName",
+    "fullName",
+    "name",
+  ]);
+
+  if (directName) {
+    return directName;
+  }
+
+  const employee: unknown = leave.employee;
+
+  if (employee && typeof employee === "object") {
+    const employeeRecord = employee as Record<string, unknown>;
+    const fullName: string | null = getTextValue(employeeRecord, [
+      "fullName",
+      "name",
+    ]);
+
+    if (fullName) {
+      return fullName;
+    }
+
+    const firstName: string | null = getTextValue(employeeRecord, ["firstName"]);
+    const lastName: string | null = getTextValue(employeeRecord, ["lastName"]);
+
+    if (firstName || lastName) {
+      return [firstName, lastName].filter(Boolean).join(" ");
+    }
+  }
+
+  const employeeId: string | null = getTextValue(leave, ["employeeId"]);
+  return employeeId ? `Employee #${employeeId}` : "Employee";
+}
+
+function getLeaveTypeLabel(
+  leave: Record<string, unknown>,
+): string {
+  return (
+    getTextValue(leave, [
+      "leaveType",
+      "policyName",
+      "leavePolicyName",
+      "reason",
+    ]) ?? "Leave request"
+  );
+}
+
+function getLeavePeriod(
+  leave: Record<string, unknown>,
+): string {
+  const start: string | null = getTextValue(leave, ["startDate"]);
+  const end: string | null = getTextValue(leave, ["endDate"]);
+
+  if (!start && !end) {
+    return "Date not available";
+  }
+
+  if (start && end) {
+    return `${formatLeaveDate(start)} – ${formatLeaveDate(end)}`;
+  }
+
+  return formatLeaveDate(start ?? end ?? "");
+}
+
+function formatLeaveDate(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function getStoredUser(): StoredUser | null {
-  const storedUserJson: string | null =
-    localStorage.getItem("authUser");
+  const storedUserJson: string | null = localStorage.getItem("authUser");
 
   if (!storedUserJson) {
     return null;
   }
 
   try {
-    const storedUser: StoredUser =
-      JSON.parse(storedUserJson) as StoredUser;
+    const user = JSON.parse(storedUserJson) as StoredUser;
 
-    if (storedUser.role !== "TeamLead") {
+    if (user.role !== "TeamLead") {
       return null;
     }
 
-    return storedUser;
+    return user;
   } catch {
     return null;
-  }
-}
-
-function getInitials(fullName?: string): string {
-  if (!fullName?.trim()) {
-    return "TL";
-  }
-
-  const nameParts: string[] =
-    fullName.trim().split(/\s+/).filter(Boolean);
-
-  if (nameParts.length === 1) {
-    return nameParts[0].slice(0, 2).toUpperCase();
-  }
-
-  return (
-    nameParts[0][0] +
-    nameParts[nameParts.length - 1][0]
-  ).toUpperCase();
-}
-
-/*
- * Handles both string statuses and common numeric enum values.
- * If your LeaveStatus enum uses different numeric values, replace
- * these three numbers with the enum's actual values.
- */
-function normalizeLeaveStatus(status: unknown): string {
-  if (typeof status === "string") {
-    const normalized: string = status.trim().toLowerCase();
-
-    if (normalized === "pending" || normalized === "1") {
-      return "pending";
-    }
-
-    if (normalized === "approved" || normalized === "2") {
-      return "approved";
-    }
-
-    if (normalized === "rejected" || normalized === "3") {
-      return "rejected";
-    }
-
-    return normalized;
-  }
-
-  if (status === 1) {
-    return "pending";
-  }
-
-  if (status === 2) {
-    return "approved";
-  }
-
-  if (status === 3) {
-    return "rejected";
-  }
-
-  return "";
-}
-
-function getLeaveTypeText(leaveType: unknown): string {
-  if (typeof leaveType === "string") {
-    const trimmed: string = leaveType.trim();
-
-    if (trimmed && !/^\d+$/.test(trimmed)) {
-      return trimmed;
-    }
-  }
-
-  const numericType: number = Number(leaveType);
-
-  switch (numericType) {
-    case 1:
-      return "Annual";
-    case 2:
-      return "Sick";
-    case 3:
-      return "Casual";
-    default:
-      return `Type ${String(leaveType)}`;
   }
 }

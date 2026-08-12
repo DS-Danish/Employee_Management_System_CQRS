@@ -21,6 +21,7 @@ import {
   EmployeesPage,
 } from "./Pages/EmployeesPage";
 import EmployeeProfilePage from "./Pages/EmployeeProfilePage";
+import EmployeeProjectsPage from "./Pages/EmployeeProjectsPage";
 import LoginPage from "./Pages/LoginPage";
 import MyLeavesPage from "./Pages/MyLeavesPage";
 import PendingLeavesPage from "./Pages/PendingLeavesPage";
@@ -101,6 +102,15 @@ React.ReactElement {
             path="leaves"
             element={
               <MyLeavesPage />
+            }
+          />
+
+          {/* MY PROJECTS */}
+
+          <Route
+            path="my-projects"
+            element={
+              <EmployeeProjectsPage />
             }
           />
 

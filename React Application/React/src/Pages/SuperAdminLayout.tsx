@@ -13,6 +13,7 @@ import ApartmentIcon from "@mui/icons-material/Apartment";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import GroupsIcon from "@mui/icons-material/Groups";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
 import SecurityIcon from "@mui/icons-material/Security";
@@ -69,6 +70,14 @@ const navigationItems:
 
       icon:
         <GroupsIcon />,
+    },
+    {
+      label: "Users",
+      path:
+        "/super-admin/users",
+
+      icon:
+        <ManageAccountsIcon />,
     },
     {
       label: "Departments",

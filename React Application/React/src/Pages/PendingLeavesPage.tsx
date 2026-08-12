@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -84,6 +85,98 @@ React.ReactElement {
     successMessage,
     setSuccessMessage,
   ] = useState<string>("");
+
+  const LEAVES_PER_BATCH = 10;
+
+  const [
+    visibleLeaveCount,
+    setVisibleLeaveCount,
+  ] = useState<number>(
+    LEAVES_PER_BATCH,
+  );
+
+  const scrollContainerRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  const loadMoreTriggerRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  const displayedLeaves: Leave[] =
+    leaves.slice(
+      0,
+      visibleLeaveCount,
+    );
+
+  const hasMoreLeaves: boolean =
+    visibleLeaveCount <
+    leaves.length;
+
+  useEffect(() => {
+    setVisibleLeaveCount(
+      LEAVES_PER_BATCH,
+    );
+  }, [leaves]);
+
+  useEffect(() => {
+    const trigger:
+      HTMLDivElement | null =
+      loadMoreTriggerRef.current;
+
+    if (
+      !trigger ||
+      !hasMoreLeaves
+    ) {
+      return;
+    }
+
+    const observer =
+      new IntersectionObserver(
+        (
+          entries:
+            IntersectionObserverEntry[],
+        ): void => {
+          const entry:
+            IntersectionObserverEntry | undefined =
+            entries[0];
+
+          if (
+            entry?.isIntersecting
+          ) {
+            setVisibleLeaveCount(
+              (
+                currentCount:
+                  number,
+              ): number =>
+                Math.min(
+                  currentCount +
+                    LEAVES_PER_BATCH,
+                  leaves.length,
+                ),
+            );
+          }
+        },
+        {
+          root:
+            scrollContainerRef.current,
+          rootMargin:
+            "150px 0px",
+          threshold: 0.1,
+        },
+      );
+
+    observer.observe(trigger);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    hasMoreLeaves,
+    leaves.length,
+  ]);
 
   const loadPendingLeaves =
     useCallback(
@@ -344,8 +437,17 @@ React.ReactElement {
               </Box>
             ) : (
               <Box
+                ref={scrollContainerRef}
                 sx={{
-                  overflowX: "auto",
+                  maxHeight: {
+                    xs: "58vh",
+                    md: "56vh",
+                  },
+                  overflow: "auto",
+                  overscrollBehavior:
+                    "contain",
+                  scrollbarGutter:
+                    "stable",
                 }}
               >
                 <Box
@@ -387,7 +489,7 @@ React.ReactElement {
                   </thead>
 
                   <tbody>
-                    {leaves.map(
+                    {displayedLeaves.map(
                       leave => (
                         <tr
                           key={
@@ -481,6 +583,11 @@ React.ReactElement {
                     )}
                   </tbody>
                 </Box>
+
+                <Box
+                  ref={loadMoreTriggerRef}
+                  sx={{ height: 1 }}
+                />
               </Box>
             )}
           </Paper>

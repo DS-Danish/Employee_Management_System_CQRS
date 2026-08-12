@@ -211,6 +211,76 @@ public sealed class AuthController : ControllerBase
         return Ok(response);
     }
 
+
+    // =========================================================
+    // GET ALL SYSTEM USERS
+    // =========================================================
+
+    [HttpGet("users")]
+    [Authorize(Roles = AppRoles.SuperAdmin)]
+    public async Task<ActionResult<
+        IReadOnlyList<SystemUserResponse>>> GetUsers(
+        CancellationToken cancellationToken)
+    {
+        List<ApplicationUser> users =
+            await _userManager
+                .Users
+                .AsNoTracking()
+                .OrderBy(user => user.FullName)
+                .ThenBy(user => user.Email)
+                .ToListAsync(cancellationToken);
+
+        var result =
+            new List<SystemUserResponse>(
+                users.Count);
+
+        foreach (ApplicationUser user in users)
+        {
+            IList<string> assignedRoles =
+                await _userManager
+                    .GetRolesAsync(user);
+
+            string role =
+                GetPrimaryRole(
+                    assignedRoles.Where(
+                        assignedRole =>
+                            AppRoles.All.Contains(
+                                assignedRole,
+                                StringComparer.OrdinalIgnoreCase)));
+
+            string? departmentName = null;
+
+            if (user.DepartmentId.HasValue)
+            {
+                departmentName =
+                    await _databaseContext
+                        .Departments
+                        .AsNoTracking()
+                        .Where(
+                            department =>
+                                department.Id ==
+                                user.DepartmentId.Value)
+                        .Select(
+                            department =>
+                                department.Name)
+                        .FirstOrDefaultAsync(
+                            cancellationToken);
+            }
+
+            result.Add(
+                new SystemUserResponse(
+                    user.Id,
+                    user.EmployeeId,
+                    user.FullName,
+                    user.Email ?? string.Empty,
+                    role,
+                    user.DepartmentId,
+                    departmentName));
+        }
+
+        return Ok(result);
+    }
+
     // =========================================================
     // GET EMPLOYEES THAT DO NOT HAVE USER ACCOUNTS
     // =========================================================
@@ -827,6 +897,16 @@ public sealed class AuthController : ControllerBase
 
         return null;
     }
+
+
+    public sealed record SystemUserResponse(
+        string UserId,
+        Guid? EmployeeId,
+        string FullName,
+        string Email,
+        string Role,
+        Guid? DepartmentId,
+        string? DepartmentName);
 
     // =========================================================
     // AVAILABLE EMPLOYEE RESPONSE
