@@ -245,7 +245,12 @@ public sealed class ProjectsController : ControllerBase
          * Employees may only complete projects that are
          * assigned to their own employee record.
          */
-        if (User.IsInRole(AppRoles.Employee))
+        bool isEmployeeOnly =
+            User.IsInRole(AppRoles.Employee) &&
+            !User.IsInRole(AppRoles.TeamLead) &&
+            !User.IsInRole(AppRoles.SuperAdmin);
+
+        if (isEmployeeOnly)
         {
             ApplicationUser? user =
                 await _userManager.GetUserAsync(

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EmployeeManagement.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260807130605_AddLeaveManagement")]
-    partial class AddLeaveManagement
+    [Migration("20260815022428_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -408,19 +408,20 @@ namespace EmployeeManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("Permissions", (string)null);
                 });
 
-            modelBuilder.Entity("EmployeeManagement.Infrastructure.Identity.UserPermission", b =>
+            modelBuilder.Entity("EmployeeManagement.Infrastructure.Identity.RolePermission", b =>
                 {
-                    b.Property<string>("UserId")
+                    b.Property<string>("RoleId")
+                        .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("PermissionId")
                         .HasColumnType("int");
 
-                    b.HasKey("UserId", "PermissionId");
+                    b.HasKey("RoleId", "PermissionId");
 
                     b.HasIndex("PermissionId");
 
-                    b.ToTable("UserPermissions", (string)null);
+                    b.ToTable("RolePermissions", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -669,23 +670,23 @@ namespace EmployeeManagement.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
-            modelBuilder.Entity("EmployeeManagement.Infrastructure.Identity.UserPermission", b =>
+            modelBuilder.Entity("EmployeeManagement.Infrastructure.Identity.RolePermission", b =>
                 {
                     b.HasOne("EmployeeManagement.Infrastructure.Identity.Permission", "Permission")
-                        .WithMany("UserPermissions")
+                        .WithMany("RolePermissions")
                         .HasForeignKey("PermissionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EmployeeManagement.Infrastructure.Identity.ApplicationUser", "User")
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", "Role")
                         .WithMany()
-                        .HasForeignKey("UserId")
+                        .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Permission");
 
-                    b.Navigation("User");
+                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -746,7 +747,7 @@ namespace EmployeeManagement.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("EmployeeManagement.Infrastructure.Identity.Permission", b =>
                 {
-                    b.Navigation("UserPermissions");
+                    b.Navigation("RolePermissions");
                 });
 #pragma warning restore 612, 618
         }
