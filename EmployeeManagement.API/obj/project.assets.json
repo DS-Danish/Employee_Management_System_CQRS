@@ -5521,11 +5521,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Melior\\EmployeeManagement.API\\EmployeeManagement.API.csproj",
+      "projectUniqueName": "d:\\Melior\\EmployeeManagement.API\\EmployeeManagement.API.csproj",
       "projectName": "EmployeeManagement.API",
-      "projectPath": "D:\\Melior\\EmployeeManagement.API\\EmployeeManagement.API.csproj",
+      "projectPath": "d:\\Melior\\EmployeeManagement.API\\EmployeeManagement.API.csproj",
       "packagesPath": "C:\\Users\\US\\.nuget\\packages\\",
-      "outputPath": "D:\\Melior\\EmployeeManagement.API\\obj\\",
+      "outputPath": "d:\\Melior\\EmployeeManagement.API\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\US\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -5540,11 +5540,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "D:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj": {
-              "projectPath": "D:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj"
+            "d:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj": {
+              "projectPath": "d:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj"
             },
-            "D:\\Melior\\EmployeeManagement.Infrastructure\\EmployeeManagement.Infrastructure.csproj": {
-              "projectPath": "D:\\Melior\\EmployeeManagement.Infrastructure\\EmployeeManagement.Infrastructure.csproj"
+            "d:\\Melior\\EmployeeManagement.Infrastructure\\EmployeeManagement.Infrastructure.csproj": {
+              "projectPath": "d:\\Melior\\EmployeeManagement.Infrastructure\\EmployeeManagement.Infrastructure.csproj"
             }
           }
         }

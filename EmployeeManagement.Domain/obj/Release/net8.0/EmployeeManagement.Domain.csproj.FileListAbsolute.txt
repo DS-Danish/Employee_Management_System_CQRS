@@ -1,0 +1,12 @@
+d:\Melior\EmployeeManagement.Domain\bin\Release\net8.0\EmployeeManagement.Domain.deps.json
+d:\Melior\EmployeeManagement.Domain\bin\Release\net8.0\EmployeeManagement.Domain.dll
+d:\Melior\EmployeeManagement.Domain\bin\Release\net8.0\EmployeeManagement.Domain.pdb
+d:\Melior\EmployeeManagement.Domain\obj\Release\net8.0\EmployeeManagement.Domain.GeneratedMSBuildEditorConfig.editorconfig
+d:\Melior\EmployeeManagement.Domain\obj\Release\net8.0\EmployeeManagement.Domain.AssemblyInfoInputs.cache
+d:\Melior\EmployeeManagement.Domain\obj\Release\net8.0\EmployeeManagement.Domain.AssemblyInfo.cs
+d:\Melior\EmployeeManagement.Domain\obj\Release\net8.0\EmployeeManagement.Domain.csproj.CoreCompileInputs.cache
+d:\Melior\EmployeeManagement.Domain\obj\Release\net8.0\EmployeeManagement.Domain.sourcelink.json
+d:\Melior\EmployeeManagement.Domain\obj\Release\net8.0\EmployeeManagement.Domain.dll
+d:\Melior\EmployeeManagement.Domain\obj\Release\net8.0\refint\EmployeeManagement.Domain.dll
+d:\Melior\EmployeeManagement.Domain\obj\Release\net8.0\EmployeeManagement.Domain.pdb
+d:\Melior\EmployeeManagement.Domain\obj\Release\net8.0\ref\EmployeeManagement.Domain.dll

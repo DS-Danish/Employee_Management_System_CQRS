@@ -34,6 +34,10 @@ builder.Services.AddScoped<
     ICurrentUserService,
     CurrentUserService>();
 
+string frontendUrl =
+    builder.Configuration["FrontendUrl"]
+    ?? "http://localhost:5173";
+
 builder.Services.AddCors(
     options =>
     {
@@ -42,9 +46,7 @@ builder.Services.AddCors(
             policy =>
             {
                 policy
-                    .WithOrigins(
-                        "http://localhost:5173",
-                        "http://localhost:5174")
+                    .WithOrigins(frontendUrl.TrimEnd('/'))
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             });

@@ -916,11 +916,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj",
+      "projectUniqueName": "d:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj",
       "projectName": "EmployeeManagement.Application",
-      "projectPath": "D:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj",
+      "projectPath": "d:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj",
       "packagesPath": "C:\\Users\\US\\.nuget\\packages\\",
-      "outputPath": "D:\\Melior\\EmployeeManagement.Application\\obj\\",
+      "outputPath": "d:\\Melior\\EmployeeManagement.Application\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\US\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -935,8 +935,8 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "D:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj": {
-              "projectPath": "D:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj"
+            "d:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj": {
+              "projectPath": "d:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj"
             }
           }
         }
