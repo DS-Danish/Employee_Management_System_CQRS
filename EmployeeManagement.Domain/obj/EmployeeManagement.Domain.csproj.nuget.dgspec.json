@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "d:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj": {}
+    "D:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj": {}
   },
   "projects": {
-    "d:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj": {
+    "D:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj",
+        "projectUniqueName": "D:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj",
         "projectName": "EmployeeManagement.Domain",
-        "projectPath": "d:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj",
+        "projectPath": "D:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj",
         "packagesPath": "C:\\Users\\US\\.nuget\\packages\\",
-        "outputPath": "d:\\Melior\\EmployeeManagement.Domain\\obj\\",
+        "outputPath": "D:\\Melior\\EmployeeManagement.Domain\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\US\\AppData\\Roaming\\NuGet\\NuGet.Config"

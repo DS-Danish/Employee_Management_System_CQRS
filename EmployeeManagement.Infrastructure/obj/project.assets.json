@@ -5217,11 +5217,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "d:\\Melior\\EmployeeManagement.Infrastructure\\EmployeeManagement.Infrastructure.csproj",
+      "projectUniqueName": "D:\\Melior\\EmployeeManagement.Infrastructure\\EmployeeManagement.Infrastructure.csproj",
       "projectName": "EmployeeManagement.Infrastructure",
-      "projectPath": "d:\\Melior\\EmployeeManagement.Infrastructure\\EmployeeManagement.Infrastructure.csproj",
+      "projectPath": "D:\\Melior\\EmployeeManagement.Infrastructure\\EmployeeManagement.Infrastructure.csproj",
       "packagesPath": "C:\\Users\\US\\.nuget\\packages\\",
-      "outputPath": "d:\\Melior\\EmployeeManagement.Infrastructure\\obj\\",
+      "outputPath": "D:\\Melior\\EmployeeManagement.Infrastructure\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\US\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -5236,11 +5236,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "d:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj": {
-              "projectPath": "d:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj"
+            "D:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj": {
+              "projectPath": "D:\\Melior\\EmployeeManagement.Application\\EmployeeManagement.Application.csproj"
             },
-            "d:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj": {
-              "projectPath": "d:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj"
+            "D:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj": {
+              "projectPath": "D:\\Melior\\EmployeeManagement.Domain\\EmployeeManagement.Domain.csproj"
             }
           }
         }

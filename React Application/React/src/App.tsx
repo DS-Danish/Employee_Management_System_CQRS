@@ -10,6 +10,7 @@ import {
   AppPermissions,
 } from "./Constants/permissions";
 
+
 import {
   EmployeeLayout,
 } from "./Pages/EmployeeLayout";
@@ -387,18 +388,16 @@ React.ReactElement {
           />
 
           <Route
-            path="users/create"
-            element={
-              <CreateUserPage />
-            }
-          />
-
-          <Route
             path="permissions"
             element={
               <PermissionManagementPage />
             }
           />
+
+          <Route
+          path="users"
+          element={<CreateUserPage />}
+        />
 
           {/* =====================
               LEAVE MANAGEMENT
